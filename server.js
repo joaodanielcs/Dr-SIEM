@@ -15,10 +15,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const pool = new Pool({
-    host: process.env.PG_HOST,        // ◄ Alterado de DB_HOST
-    user: process.env.PG_USER,        // ◄ Alterado de DB_USER
-    password: process.env.PG_PASSWORD, // ◄ Alterado de DB_PASSWORD
-    database: process.env.PG_NAME,     // ◄ Alterado de DB_NAME
+    host: process.env.PG_HOST,
+    user: process.env.PG_USER,
+    password: process.env.PG_PASSWORD,
+    database: process.env.PG_NAME,
     port: 5432,
 });
 
@@ -32,7 +32,6 @@ function gerarHash(senha) {
     return crypto.createHash('sha256').update(senha).digest('hex');
 }
 
-// === MIDDLEWARE DE SESSÃO PROTEGIDA ===
 function verificarToken(req, res, next) {
     const token = req.headers['authorization'];
     if (!token) return res.status(401).json({ error: 'Autenticação pendente.' });
@@ -45,11 +44,9 @@ function verificarToken(req, res, next) {
     });
 }
 
-// === INICIALIZAÇÃO DAY-0 DOS BANCOS ===
 async function initDatabases() {
     const pgClient = await pool.connect();
     try {
-        // Tabela de Usuários Locais (Apenas para o ADMIN de gerenciamento)
         await pgClient.query(`
             CREATE TABLE IF NOT EXISTS siem_local_users (
                 id SERIAL PRIMARY KEY,
@@ -59,7 +56,6 @@ async function initDatabases() {
             );
         `);
 
-        // Cria o admin/admin inicial se o banco estiver zerado
         const userCheck = await pgClient.query('SELECT * FROM siem_local_users WHERE username = \'ADMIN\'');
         if (userCheck.rows.length === 0) {
             await pgClient.query('INSERT INTO siem_local_users (username, password_hash, force_change) VALUES ($1, $2, $3)', 
@@ -67,7 +63,6 @@ async function initDatabases() {
             console.log("⚠️ [DAY-0] Usuário temporário criado: ADMIN / admin (Troca obrigatória no primeiro acesso).");
         }
 
-        // Tabela de Configurações Dinâmicas do AD salvas pela Web
         await pgClient.query(`
             CREATE TABLE IF NOT EXISTS system_settings (
                 key VARCHAR(50) PRIMARY KEY,
@@ -75,7 +70,6 @@ async function initDatabases() {
             );
         `);
 
-        // Tabela de controle de sessões ativas (Locais e AD)
         await pgClient.query(`
             CREATE TABLE IF NOT EXISTS siem_sessions (
                 token VARCHAR(64) PRIMARY KEY,
@@ -88,7 +82,6 @@ async function initDatabases() {
         console.error("🔴 Erro ao subir tabelas locais:", err);
     } finally { pgClient.release(); }
 
-    // Inicialização do ClickHouse para Logs Massivos
     try {
         await chClient.command({ query: `CREATE TABLE IF NOT EXISTS default.ad_logons (timestamp DateTime, username String, computer_name String, ip String) ENGINE = MergeTree() ORDER BY (ip, timestamp);` });
         await chClient.command({ query: `CREATE TABLE IF NOT EXISTS default.dns_logs (timestamp DateTime, ip String, domain String, status String) ENGINE = MergeTree() ORDER BY (timestamp, domain);` });
@@ -96,12 +89,10 @@ async function initDatabases() {
 }
 setTimeout(initDatabases, 5000);
 
-// === ENDPOINT: LOGIN HÍBRIDO (LOCAL vs AD) ===
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     const userUpper = username.toUpperCase();
 
-    // ROTA A: Login do Administrador Local (Day-0)
     if (userUpper === 'ADMIN') {
         try {
             const hash = gerarHash(password);
@@ -121,7 +112,6 @@ app.post('/api/auth/login', async (req, res) => {
         } catch (err) { return res.status(500).json({ error: err.message }); }
     }
 
-    // ROTA B: Login dos Usuários do Active Directory via LDAP Dinâmico
     try {
         const settingsRes = await pool.query('SELECT * FROM system_settings');
         const config = {};
@@ -158,7 +148,6 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// === ENDPOINT: ALTERAÇÃO DA SENHA DE FÁBRICA (OBRIGATÓRIO) ===
 app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     const { new_password } = req.body;
     if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva do administrador.' });
@@ -170,13 +159,11 @@ app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// === ENDPOINTS DE CONFIGURAÇÃO DO AD (ESCRITA E LEITURA) ===
 app.get('/api/settings', verificarToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM system_settings');
         const config = {};
         result.rows.forEach(row => { 
-            // Oculta a senha do AD por segurança
             config[row.key] = row.key === 'ad_pass' ? '********' : row.value; 
         });
         res.json(config);
@@ -188,7 +175,7 @@ app.post('/api/settings', verificarToken, async (req, res) => {
     const configs = req.body;
     try {
         for (const [key, value] of Object.entries(configs)) {
-            if (key === 'ad_pass' && value === '********') continue; // Ignora se não foi alterada
+            if (key === 'ad_pass' && value === '********') continue;
             await pool.query('INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value]);
         }
         res.json({ success: true });
@@ -201,7 +188,6 @@ app.post('/api/auth/logout', verificarToken, async (req, res) => {
     res.json({ success: true });
 });
 
-// === INGESTÃO SYSLOG PI-HOLE ===
 const syslogServer = dgram.createSocket('udp4');
 syslogServer.on('message', async (msg) => {
     const logLinha = msg.toString();
@@ -222,7 +208,6 @@ syslogServer.on('message', async (msg) => {
 });
 syslogServer.bind(514);
 
-// === INGESTÃO WEBHOOK AD ===
 app.post('/api/ad/logon', async (req, res) => {
     const { username, computer_name, ip } = req.body;
     try {
@@ -235,7 +220,6 @@ app.post('/api/ad/logon', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// === QUERY DE AUDITORIA COM CORRELAÇÃO ===
 app.get('/api/logs', verificarToken, async (req, res) => {
     let { page = 1, limit = 500, search = '', status = '' } = req.query;
     page = parseInt(page); limit = parseInt(limit);
@@ -254,7 +238,7 @@ app.get('/api/logs', verificarToken, async (req, res) => {
                 coalesce((SELECT username FROM default.ad_logons WHERE ip = dns_logs.ip AND timestamp <= dns_logs.timestamp ORDER BY timestamp DESC LIMIT 1), if(ip LIKE '172.16.24.%', 'MÓVEL / BYOD', '-')) as usuario
             FROM default.dns_logs WHERE ${whereClause} ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}
         `;
-        const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}`, format: 'JSONEachRow' });
+        const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}', format: 'JSONEachRow' });
         const totalRows = await totalResult.json();
         const total = totalRows[0] ? parseInt(totalRows[0].count) : 0;
 

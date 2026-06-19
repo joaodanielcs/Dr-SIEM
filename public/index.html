@@ -121,7 +121,6 @@
         }
         .full-width { grid-column: span 2; }
         
-        /* ESTILOS DO PAINEL DE LOGS */
         .top-bar {
             display: flex;
             justify-content: space-between;
@@ -168,6 +167,7 @@
             width: auto;
             padding: 8px 16px;
             margin: 0;
+            font-size: 12px;
         }
         .btn-danger {
             background-color: var(--error-color);
@@ -236,7 +236,7 @@
                 <input type="text" id="ad-group" placeholder="Ex: SIEM_OPERADORES" required>
             </div>
             <button type="submit" class="full-width">Salvar e Ativar Conexão</button>
-            <button type="button" onclick="showDashboardScreen()" class="full-width" style="background-color: #34495e; color: white;">Pular para os Logs ➔</button>
+            <button type="button" id="btn-cancel-config" onclick="showDashboardScreen()" class="full-width" style="background-color: #34495e; color: white; display:none;">Voltar para o Console ➔</button>
         </form>
     </div>
 
@@ -246,7 +246,10 @@
                 <h3 style="margin:0; color: var(--accent-color); letter-spacing: 1px;">SIEM // DR.MONITORA</h3>
                 <span style="font-size: 12px; color: #8a9ba8;">CONSOLE DE INGESTÃO LOGS (CLICKHOUSE ENGINE)</span>
             </div>
-            <button onclick="handleLogout()" class="btn-small btn-danger">Sair / Logoff</button>
+            <div style="display:flex; gap:10px;">
+                <button onclick="backToSettings()" class="btn-small" style="background-color: #34495e; color: white; font-weight:bold;">⚙️ Configurar AD</button>
+                <button onclick="handleLogout()" class="btn-small btn-danger">Sair / Logoff</button>
+            </div>
         </div>
 
         <div class="filter-bar">
@@ -288,6 +291,7 @@
     <script>
         let sessionToken = '';
         let currentPage = 1;
+        let logInterval = null;
 
         function showError(elementId, msg) {
             const box = document.getElementById(elementId);
@@ -316,7 +320,11 @@
             if(data.force_change) {
                 document.getElementById('login-screen').classList.remove('active');
                 document.getElementById('password-screen').classList.add('active');
+            } else if(data.ad_configured) {
+                // FLUXO DE PRODUÇÃO: Se já tem AD configurado, vai direto para o painel de controle
+                showDashboardScreen();
             } else {
+                // FLUXO DE CORREÇÃO: Só exibe o setup se for o primeiro boot da usina (Day-0)
                 showSettingsScreen();
             }
         }
@@ -345,14 +353,21 @@
         async function showSettingsScreen() {
             document.getElementById('login-screen').classList.remove('active');
             document.getElementById('password-screen').classList.remove('active');
+            document.getElementById('dashboard-screen').classList.remove('active');
+            document.body.style.alignItems = 'center';
             document.getElementById('settings-screen').classList.add('active');
+
+            if(logInterval) clearInterval(logInterval);
 
             const res = await fetch('/api/settings', {
                 headers: { 'Authorization': sessionToken }
             });
             if(res.ok) {
                 const config = await res.json();
-                if(config.ad_ip) document.getElementById('ad-ip').value = config.ad_ip;
+                if(config.ad_ip) {
+                    document.getElementById('ad-ip').value = config.ad_ip;
+                    document.getElementById('btn-cancel-config').style.display = 'block'; // Mostra botão de voltar se já existir configuração
+                }
                 if(config.ad_domain) document.getElementById('ad-domain').value = config.ad_domain;
                 if(config.ad_user) document.getElementById('ad-user').value = config.ad_user;
                 if(config.ad_pass) document.getElementById('ad-pass').value = config.ad_pass;
@@ -381,9 +396,9 @@
             });
 
             if(res.ok) {
-                msgBox.innerText = "✓ Configurações salvas! Redirecionando para o painel...";
+                msgBox.innerText = "✓ Configurações salvas de forma persistente!";
                 msgBox.style.display = 'block';
-                setTimeout(showDashboardScreen, 1500); // Avança após salvar
+                setTimeout(showDashboardScreen, 1200);
             } else {
                 const data = await res.json();
                 showError('settings-msg', data.error);
@@ -392,10 +407,14 @@
 
         function showDashboardScreen() {
             document.getElementById('settings-screen').classList.remove('active');
-            document.body.style.alignItems = 'flex-start'; // Alinha o painel grande no topo
+            document.body.style.alignItems = 'flex-start';
             document.getElementById('dashboard-screen').classList.add('active');
             loadLogs(1);
-            setInterval(() => loadLogs(currentPage), 5000); // Pooling de atualização a cada 5s
+            logInterval = setInterval(() => loadLogs(currentPage), 5000);
+        }
+
+        function backToSettings() {
+            showSettingsScreen();
         }
 
         async function loadLogs(page) {
@@ -442,6 +461,7 @@
         }
 
         async function handleLogout() {
+            if(logInterval) clearInterval(logInterval);
             await fetch('/api/auth/logout', {
                 method: 'POST',
                 headers: { 'Authorization': sessionToken }

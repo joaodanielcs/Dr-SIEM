@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "^1.1.0",
+    "activedirectory2": "^2.1.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "pg": "^8.11.5"

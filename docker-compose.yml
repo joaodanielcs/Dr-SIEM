@@ -30,8 +30,8 @@ services:
     volumes:
       - ./:/usr/src/app
     ports:
-      - "443:8080"      
-      - "514:514/udp"    
+      - "443:8443"       # ◄ MUDANÇA: Recebe HTTPS na 443 física e joga na 8443 HTTPS do Node
+      - "514:514/udp"    # Ingestão de logs dos Pi-holes
     environment:
       PG_HOST: relational_db
       PG_USER: ${POSTGRES_USER}

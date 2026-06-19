@@ -6,16 +6,16 @@
     <title>SIEM // SYSTEM WORKSPACE</title>
     <style>
         :root {
-            --bg-main: #0f172a;
-            --bg-sidebar: #1e293b;
-            --bg-card: #1e293b;
-            --bg-input: #0f172a;
-            --border-color: #334155;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;
-            --accent-hover: #0ea5e9;
-            --success: #22c55e;
+            --bg-main: #0b0f19;
+            --bg-sidebar: #111827;
+            --bg-card: #1f2937;
+            --bg-input: #0b0f19;
+            --border-color: #374151;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #00f2fe;
+            --accent-hover: #00c6ff;
+            --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
         }
@@ -29,7 +29,6 @@
             overflow: hidden;
         }
         
-        /* LAYOUT DE TELA CHEIA PARA AUTH */
         .auth-wrapper {
             width: 100vw;
             height: 100vh;
@@ -51,7 +50,6 @@
             max-width: 420px;
         }
 
-        /* WORKSPACE CORE */
         .workspace-shell {
             display: none;
             width: 100vw;
@@ -61,7 +59,6 @@
             display: flex;
         }
         
-        /* SIDEBAR PROFISSIONAL */
         .sidebar {
             width: 280px;
             background-color: var(--bg-sidebar);
@@ -105,7 +102,7 @@
             transition: all 0.2s;
         }
         .menu-item:hover, .menu-item.active {
-            background-color: rgba(56, 189, 248, 0.1);
+            background-color: rgba(0, 242, 254, 0.1);
             color: var(--accent);
         }
         .menu-item .icon { margin-right: 12px; font-size: 16px; }
@@ -120,7 +117,6 @@
             font-size: 13px;
         }
 
-        /* CONTEÚDO PRINCIPAL RECEPTOR */
         .main-panel {
             flex: 1;
             display: flex;
@@ -143,11 +139,9 @@
             overflow-y: auto;
         }
         
-        /* ELEMENTOS DINÂMICOS DE INTERFACE */
         .screen-view { display: none; }
         .screen-view.active { display: block; }
         
-        /* TABELAS MODERNAS */
         .table-card {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -157,7 +151,7 @@
         }
         .siem-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         .siem-table th {
-            background-color: rgba(0,0,0,0.15);
+            background-color: rgba(0,0,0,0.25);
             color: var(--text-muted);
             padding: 14px 16px;
             text-transform: uppercase;
@@ -168,13 +162,12 @@
         .siem-table td { padding: 14px 16px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
         .siem-table tr:hover { background-color: rgba(255,255,255,0.01); }
         
-        /* FILTROS E TOOLBARS */
         .toolbar-grid { display: flex; gap: 15px; margin-bottom: 20px; }
         input, select, textarea {
             background-color: var(--bg-input);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 10px 14px;
+            padding: 11px 14px;
             border-radius: 6px;
             font-size: 13px;
             width: 100%;
@@ -184,10 +177,10 @@
         .btn {
             background-color: var(--accent);
             color: #000;
-            padding: 10px 18px;
+            padding: 11px 18px;
             border: none;
             border-radius: 6px;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 13px;
             cursor: pointer;
             text-transform: uppercase;
@@ -197,12 +190,11 @@
             gap: 8px;
         }
         .btn:hover { background-color: var(--accent-hover); }
-        .btn-sec { background-color: #334155; color: var(--text-main); }
-        .btn-sec:hover { background-color: #475569; }
+        .btn-sec { background-color: #374151; color: var(--text-main); }
+        .btn-sec:hover { background-color: #4b5563; }
         .btn-danger { background-color: var(--danger); color: white; }
         .btn-danger:hover { background-color: #dc2626; }
         
-        /* LABELS E COMPONENTES GERAIS */
         .badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -210,10 +202,9 @@
             font-weight: 700;
             text-transform: uppercase;
         }
-        .badge-success { background-color: rgba(34,197,94,0.15); color: #4ade80; }
+        .badge-success { background-color: rgba(16,185,129,0.15); color: #34d399; }
         .badge-danger { background-color: rgba(239,68,68,0.15); color: #f87171; }
         
-        /* PAINEL DIVIDIDO (SPLIT VIEW) PARA CRUD AD */
         .split-layout { display: flex; gap: 24px; align-items: flex-start; }
         .split-list { flex: 1; min-width: 0; }
         .split-form-panel { width: 480px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; flex-shrink: 0; }
@@ -297,7 +288,7 @@
         
         <div class="main-panel">
             <div class="top-navbar">
-                <h4 id="nav-title-header" style="text-transform:uppercase; font-size:14px; letter-spacing:0.5px;">CONSOLE DE INGESTÃO DE LOGS</h4>
+                <h4 id="nav-title-header" style="text-transform:uppercase; font-size:14px; letter-spacing:0.5px;">CONSOLES DE INGESTÃO DE EVENTOS (SYSLOG NATAL)</h4>
                 <div style="font-size:12px; color:var(--text-muted);">Status da Usina: <span class="badge badge-success">Online</span></div>
             </div>
             
@@ -305,7 +296,7 @@
                 <div id="view-logs" class="screen-view active">
                     <div class="toolbar-grid">
                         <input type="text" id="search-log" placeholder="Filtrar por Domínio ou IP de Origem..." oninput="loadLogs(1)">
-                        <select id="filter-status" onchange="loadLogs(1]" style="max-width: 220px;">
+                        <select id="filter-status" onchange="loadLogs(1)" style="max-width: 220px;">
                             <option value="">Todos os Eventos</option>
                             <option value="PERMITIDO">PERMITIDO</option>
                             <option value="BLOQUEADO">BLOQUEADO</option>
@@ -336,11 +327,12 @@
                 </div>
 
                 <div id="view-ad-users" class="screen-view">
+                    <div id="ad-error-display" class="error-box"></div>
                     <div class="split-layout">
                         <div class="split-list">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                                <h3 style="font-size:16px;">Catálogo de Identidades Ativas</h3>
-                                <button class="btn" onclick="clearADForm()">+ Novo Usuário AD</button>
+                                <h3 style="font-size:16px;">Catálogo de Identidades Ativas no Domínio</h3>
+                                <button class="btn btn-sec" onclick="loadADUsers()">🔄 Atualizar Lista AD</button>
                             </div>
                             <div class="table-card">
                                 <table class="siem-table">
@@ -354,37 +346,35 @@
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="ad-users-rows"></tbody>
+                                    <tbody id="ad-users-rows">
+                                        <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Consultando controlador de domínio...</td></tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
                         
                         <div class="split-form-panel">
-                            <h3 id="form-ad-title" style="font-size:14px; text-transform:uppercase; color:var(--accent); margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">Ficha cadastral de Identidade</h3>
+                            <h3 id="form-ad-title" style="font-size:14px; text-transform:uppercase; color:var(--accent); margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">Ficha Cadastral de Identidade</h3>
                             <form onsubmit="handleSaveADUser(event)">
                                 <div class="form-row-2">
                                     <div>
                                         <span class="form-lbl">Nome Exibição</span>
-                                        <input type="text" id="ad-form-display" placeholder="Ex: Lucas Mendes" required>
+                                        <input type="text" id="ad-form-display" disabled style="opacity:0.6;">
                                     </div>
                                     <div>
                                         <span class="form-lbl">sAMAccountName (Login)</span>
-                                        <input type="text" id="ad-form-username" placeholder="Ex: lucas.mendes" required>
+                                        <input type="text" id="ad-form-username" disabled style="opacity:0.6;">
                                     </div>
                                 </div>
                                 <div class="form-row-2">
                                     <div>
                                         <span class="form-lbl">E-mail Corporativo</span>
-                                        <input type="email" id="ad-form-email" placeholder="nome@empresa.com" required>
+                                        <input type="email" id="ad-form-email" disabled style="opacity:0.6;">
                                     </div>
                                     <div>
-                                        <span class="form-lbl">Ramal VoIP</span>
+                                        <span class="form-lbl">Ramal VoIP Local</span>
                                         <input type="text" id="ad-form-voip" placeholder="Ex: 4005">
                                     </div>
-                                </div>
-                                <div style="margin-bottom:15px;">
-                                    <span class="form-lbl">Senha / Chave AD (Apenas p/ Criação ou Reset)</span>
-                                    <input type="password" id="ad-form-password" placeholder="Preencha se desejar alterar/criar">
                                 </div>
                                 <div class="form-row-2">
                                     <div>
@@ -397,33 +387,30 @@
                                     </div>
                                 </div>
                                 <div style="margin-bottom:15px;">
-                                    <span class="form-lbl">Agendar Desativação do Acesso</span>
+                                    <span class="form-lbl">Agendar Desativação de Acesso</span>
                                     <input type="datetime-local" id="ad-form-expires">
                                 </div>
                                 <div style="margin-bottom:15px;">
-                                    <span class="form-lbl">Grupos do AD (Separados por vírgula)</span>
-                                    <textarea id="ad-form-groups" rows="2" placeholder="Ex: SIEM_OPERADORES, FINANCEIRO_GG"></textarea>
+                                    <span class="form-lbl">Grupos Atuais no AD (Somente Leitura)</span>
+                                    <textarea id="ad-form-groups" rows="2" disabled style="opacity:0.6; resize:none;"></textarea>
                                 </div>
                                 
-                                <div style="background-rgba(0,0,0,0.2); padding:12px; border-radius:6px; border:1px solid var(--border-color); margin-bottom:20px;">
+                                <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:6px; border:1px solid var(--border-color); margin-bottom:20px;">
                                     <div class="checkbox-row">
-                                        <input type="checkbox" id="ad-form-status" checked>
-                                        <label for="ad-form-status" style="min-height:0; margin:0;">Conta Ativa e Habilitada</label>
+                                        <input type="checkbox" id="ad-form-status" disabled style="opacity:0.6;">
+                                        <label style="min-height:0; margin:0; opacity:0.6;">Conta Habilitada no AD</label>
                                     </div>
                                     <div class="checkbox-row">
                                         <input type="checkbox" id="ad-form-vpn">
-                                        <label for="ad-form-vpn" style="min-height:0; margin:0;">Permitir Conexão Túnel VPN</label>
+                                        <label for="ad-form-vpn" style="min-height:0; margin:0; cursor:pointer;">Permitir Conexão Túnel VPN</label>
                                     </div>
                                     <div class="checkbox-row">
-                                        <input type="checkbox" id="ad-form-forcechange">
-                                        <label for="ad-form-forcechange" style="min-height:0; margin:0;">Exigir troca de senha no próximo logon</label>
+                                        <input type="checkbox" id="ad-form-forcechange" disabled style="opacity:0.6;">
+                                        <label style="min-height:0; margin:0; opacity:0.6;">Troca de senha pendente no AD</label>
                                     </div>
                                 </div>
                                 
-                                <div style="display:flex; gap:10px;">
-                                    <button type="submit" class="btn" style="flex:1;">Salvar Identidade</button>
-                                    <button type="button" id="btn-ad-delete" class="btn btn-danger" style="display:none;" onclick="handleDeleteADUser()">Remover</button>
-                                </div>
+                                <button type="submit" class="btn" style="width:100%;">Gravar Parâmetros Complementares</button>
                             </form>
                         </div>
                     </div>
@@ -431,7 +418,7 @@
 
                 <div id="view-settings" class="screen-view">
                     <div class="container" style="max-width:650px; margin:0;">
-                        <div id="settings-msg" class="error-box" style="border-color:var(--success); color:#4ade80; background:rgba(34,197,94,0.05)"></div>
+                        <div id="settings-msg" class="error-box" style="border-color:var(--success); color:#4ade80; background:rgba(16,185,129,0.05)"></div>
                         <form onsubmit="handleSaveSettings(event)" class="ad-grid">
                             <div class="form-group">
                                 <span class="form-lbl">IP do Controlador de Domínio Active Directory</span>
@@ -460,7 +447,7 @@
 
                 <div id="view-admin-pass" class="screen-view">
                     <div class="container" style="max-width:450px; margin:0;">
-                        <div id="admin-pass-msg" class="error-box" style="border-color:var(--success); color:#4ade80; background:rgba(34,197,94,0.05)"></div>
+                        <div id="admin-pass-msg" class="error-box" style="border-color:var(--success); color:#4ade80; background:rgba(16,185,129,0.05)"></div>
                         <form onsubmit="handleUpdateAdminPass(event)">
                             <div class="form-group">
                                 <span class="form-lbl">Nova Chave Secreta Local</span>
@@ -477,7 +464,6 @@
     <script>
         let sessionToken = '';
         let currentPage = 1;
-        let logInterval = null;
         let selectedADUser = null;
 
         function switchNav(targetScreen, element) {
@@ -489,7 +475,7 @@
             
             const titles = {
                 'view-logs': 'CONSOLES DE INGESTÃO DE EVENTOS (SYSLOG NATAL)',
-                'view-ad-users': 'GOVERNANÇA E CONTROLADORIA DE IDENTIDADES ACTIVE DIRECTORY',
+                'view-ad-users': 'GOVERNANÇA E CONTROLADORIA DE IDENTIDADES ACTIVE DIRECTORY (LIVE SEARCH)',
                 'view-settings': 'CONFIGURAÇÃO DE INFRAESTRUTURA E CONEXÃO LDAP',
                 'view-admin-pass': 'SEGURANÇA INTERNA: TROCA DA CHAVE MASTER LOCAL'
             };
@@ -555,31 +541,43 @@
 
         function changePage(dir) { loadLogs(currentPage + dir); }
 
-        // MOTOR RECEPTOR E MANIPULADOR DO CRUD DE USUÁRIOS AD
+        // ⚡ CARGA DA TABELA COM OS USUÁRIOS REAIS DO ACTIVE DIRECTORY SONDADOS VIA LDAP
         async function loadADUsers() {
+            const errBox = document.getElementById('ad-error-display');
+            errBox.style.display = 'none';
+            const tbody = document.getElementById('ad-users-rows');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Consultando controlador de domínio...</td></tr>';
+
             const res = await fetch('/api/ad/users', { headers: { 'Authorization': sessionToken } });
-            if(res.ok) {
-                const users = await res.json();
-                const tbody = document.getElementById('ad-users-rows');
-                tbody.innerHTML = '';
-                users.forEach(user => {
-                    tbody.innerHTML += `<tr style="cursor:pointer;" onclick='populateADForm(${JSON.stringify(user)})'>
-                        <td><strong>${user.display_name}</strong></td>
-                        <td><code>${user.username}</code></td>
-                        <td>${user.email}</td>
-                        <td>${user.ramal_voip || '-'}</td>
-                        <td><span class="badge ${user.vpn_access?'badge-success':'badge-danger'}">${user.vpn_access?'Sim':'Não'}</span></td>
-                        <td><span class="badge ${user.status_conta?'badge-success':'badge-danger'}">${user.status_conta?'Ativo':'Bloqueado'}</span></td>
-                    </tr>`;
-                });
+            const data = await res.json();
+            
+            if(!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--danger);">Falha na conexão LDAP.</td></tr>';
+                return showError('ad-error-display', data.error);
             }
+
+            tbody.innerHTML = '';
+            if(data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Nenhum usuário localizado no Active Directory conectado.</td></tr>';
+                return;
+            }
+
+            data.forEach(user => {
+                tbody.innerHTML += `<tr style="cursor:pointer;" onclick='populateADForm(${JSON.stringify(user)})'>
+                    <td><strong>${user.display_name}</strong></td>
+                    <td><code>${user.username}</code></td>
+                    <td>${user.email || '-'}</td>
+                    <td>${user.ramal_voip || '-'}</td>
+                    <td><span class="badge ${user.vpn_access?'badge-success':'badge-danger'}">${user.vpn_access?'Sim':'Não'}</span></td>
+                    <td><span class="badge ${user.status_conta?'badge-success':'badge-danger'}">${user.status_conta?'Ativo':'Bloqueado'}</span></td>
+                </tr>`;
+            });
         }
 
         function populateADForm(user) {
             selectedADUser = user.username;
-            document.getElementById('form-ad-title').innerText = `Editando: ${user.username}`;
+            document.getElementById('form-ad-title').innerText = `Parâmetros: ${user.username}`;
             document.getElementById('ad-form-username').value = user.username;
-            document.getElementById('ad-form-username').disabled = true;
             document.getElementById('ad-form-display').value = user.display_name;
             document.getElementById('ad-form-email').value = user.email;
             document.getElementById('ad-form-voip').value = user.ramal_voip;
@@ -590,57 +588,27 @@
             document.getElementById('ad-form-status').checked = user.status_conta;
             document.getElementById('ad-form-vpn').checked = user.vpn_access;
             document.getElementById('ad-form-forcechange').checked = user.trocar_senha_proximo_logon;
-            document.getElementById('btn-ad-delete').style.display = 'block';
-        }
-
-        function clearADForm() {
-            selectedADUser = null;
-            document.getElementById('form-ad-title').innerText = "Novo Usuário AD";
-            document.getElementById('ad-form-username').value = '';
-            document.getElementById('ad-form-username').disabled = false;
-            document.getElementById('ad-form-display').value = '';
-            document.getElementById('ad-form-email').value = '';
-            document.getElementById('ad-form-voip').value = '';
-            document.getElementById('ad-form-password').value = '';
-            document.getElementById('ad-form-computers').value = '*';
-            document.getElementById('ad-form-hours').value = '*';
-            document.getElementById('ad-form-expires').value = '';
-            document.getElementById('ad-form-groups').value = 'SIEM_OPERADORES';
-            document.getElementById('ad-form-status').checked = true;
-            document.getElementById('ad-form-vpn').checked = false;
-            document.getElementById('ad-form-forcechange').checked = false;
-            document.getElementById('btn-ad-delete').style.display = 'none';
         }
 
         async function handleSaveADUser(e) {
             e.preventDefault();
+            if(!selectedADUser) return;
+            
             const payload = {
-                username: document.getElementById('ad-form-username').value,
-                display_name: document.getElementById('ad-form-display').value,
-                email: document.getElementById('ad-form-email').value,
+                username: selectedADUser,
                 ramal_voip: document.getElementById('ad-form-voip').value,
                 computadores_autorizados: document.getElementById('ad-form-computers').value,
                 horarios_autorizados: document.getElementById('ad-form-hours').value,
                 desativar_em: document.getElementById('ad-form-expires').value,
-                grupos: document.getElementById('ad-form-groups').value,
-                status_conta: document.getElementById('ad-form-status').checked,
-                vpn_access: document.getElementById('ad-form-vpn').checked,
-                trocar_senha_proximo_logon: document.getElementById('ad-form-forcechange').checked
+                vpn_access: document.getElementById('ad-form-vpn').checked
             };
-            const method = selectedADUser ? 'PUT' : 'POST';
-            const url = selectedADUser ? `/api/ad/users/${selectedADUser}` : '/api/ad/users';
 
-            const res = await fetch(url, {
-                method, headers: { 'Content-Type': 'application/json', 'Authorization': sessionToken },
+            const res = await fetch(`/api/ad/users/${selectedADUser}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': sessionToken },
                 body: JSON.stringify(payload)
             });
-            if(res.ok) { clearADForm(); loadADUsers(); }
-        }
-
-        async function handleDeleteADUser() {
-            if(!selectedADUser) return;
-            const res = await fetch(`/api/ad/users/${selectedADUser}`, { method: 'DELETE', headers: { 'Authorization': sessionToken } });
-            if(res.ok) { clearADForm(); loadADUsers(); }
+            if(res.ok) { loadADUsers(); }
         }
 
         async function handleSaveSettings(e) {
@@ -658,7 +626,7 @@
             });
             if(res.ok) {
                 const msg = document.getElementById('settings-msg');
-                msg.innerText = "✓ Configurações de infraestrutura aplicadas com sucesso.";
+                msg.innerText = "✓ Parâmetros aplicados. Conexão LDAP reestruturada com sucesso.";
                 msg.style.display = 'block';
             }
         }

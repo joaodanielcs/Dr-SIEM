@@ -78,6 +78,36 @@ async function initDatabases() {
                 expiracao TIMESTAMPTZ NOT NULL
             );
         `);
+
+        // TABELA DE GOVERNANÇA DE IDENTIDADES E METADADOS DO AD
+        await pgClient.query(`
+            CREATE TABLE IF NOT EXISTS ad_user_extensions (
+                username VARCHAR(100) PRIMARY KEY,
+                display_name VARCHAR(150),
+                email VARCHAR(250),
+                ramal_voip VARCHAR(20),
+                vpn_access BOOLEAN DEFAULT FALSE,
+                status_conta BOOLEAN DEFAULT TRUE,
+                desativar_em TIMESTAMPTZ,
+                trocar_senha_proximo_logon BOOLEAN DEFAULT FALSE,
+                computadores_autorizados TEXT,
+                horarios_autorizados TEXT,
+                grupos TEXT
+            );
+        `);
+
+        // INJEÇÃO DAY-0: Alimenta usuários fictícios para homologação imediata da interface
+        const mockCheck = await pgClient.query('SELECT count(*) FROM ad_user_extensions');
+        if (parseInt(mockCheck.rows[0].count) === 0) {
+            await pgClient.query(`
+                INSERT INTO ad_user_extensions (username, display_name, email, ramal_voip, vpn_access, status_conta, grupos, computadores_autorizados, horarios_autorizados) VALUES 
+                ('joao.silva', 'João Silva', 'joao.silva@empresa.local', '4001', true, true, 'SIEM_OPERADORES,TI_INFRA', 'SRV-SOC-01,ST-TI-04', '08:00-18:00'),
+                ('maria.souza', 'Maria Souza', 'maria.souza@empresa.local', '4002', false, true, 'TI_SUPORTE', '*', '08:00-22:00'),
+                ('diretor.teste', 'Diretor Teste', 'diretor@empresa.local', '1000', true, false, 'DIRETORIA', '*', '24H');
+            `);
+            console.log("✓ [DAY-0] Carga inicial de usuários simulados do AD injetada.");
+        }
+
     } catch (err) {
         console.error("🔴 Erro ao subir tabelas locais:", err);
     } finally { pgClient.release(); }
@@ -88,6 +118,17 @@ async function initDatabases() {
     } catch(e) {}
 }
 setTimeout(initDatabases, 5000);
+
+// CRON DE AGENDAMENTO: Desativa contas do AD na data/hora programada pelo painel
+async function verificarAgendamentosDesativacao() {
+    try {
+        const res = await pool.query("UPDATE ad_user_extensions SET status_conta = FALSE, desativar_em = NULL WHERE desativar_em <= NOW() AND status_conta = TRUE RETURNING username");
+        res.rows.forEach(row => {
+            console.log(`🔒 [SIEM GOVERNANCE] Conta do usuário '${row.username}' foi DESATIVADA automaticamente via agendamento.`);
+        });
+    } catch (err) { console.error("Erro no cron de desativação:", err); }
+}
+setInterval(verificarAgendamentosDesativacao, 30000); // Executa a cada 30 segundos
 
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
@@ -102,7 +143,6 @@ app.post('/api/auth/login', async (req, res) => {
                 const token = crypto.randomBytes(32).toString('hex');
                 const forceChange = result.rows[0].force_change;
                 
-                // CHECAGEM INTELIGENTE DE DAY-0: O AD já foi integrado alguma vez?
                 const settingsCheck = await pool.query("SELECT 1 FROM system_settings WHERE key = 'ad_ip'");
                 const adConfigured = settingsCheck.rows.length > 0;
                 
@@ -115,7 +155,7 @@ app.post('/api/auth/login', async (req, res) => {
                     username: 'ADMIN', 
                     role: 'ADMIN', 
                     force_change: forceChange,
-                    ad_configured: adConfigured // Envia a flag para o front decidir a tela
+                    ad_configured: adConfigured
                 });
             } else {
                 return res.status(401).json({ error: 'Senha do administrador incorreta.' });
@@ -123,6 +163,7 @@ app.post('/api/auth/login', async (req, res) => {
         } catch (err) { return res.status(500).json({ error: err.message }); }
     }
 
+    // Autenticação de Operadores via AD Real
     try {
         const settingsRes = await pool.query('SELECT * FROM system_settings');
         const config = {};
@@ -155,16 +196,59 @@ app.post('/api/auth/login', async (req, res) => {
                 await pool.query('INSERT INTO siem_sessions (token, username, role, expiracao) VALUES ($1, $2, $3, NOW() + INTERVAL \'8 hours\')', 
                     [token, userUpper, 'OPERADOR']);
                 
-                res.json({ success: true, token, username: userUpper, role: 'OPERADOR', force_change: false });
+                res.json({ success: true, token, username: userUpper, role: 'OPERADOR', ad_configured: true });
             });
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ENDPOINTS DO MÓDULO DE USUÁRIOS DO ACTIVE DIRECTORY
+app.get('/api/ad/users', verificarToken, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT username, display_name, email, ramal_voip, vpn_access, status_conta, to_char(desativar_em, \'YYYY-MM-DD"T"HH24:MI\') as desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos FROM ad_user_extensions ORDER BY display_name ASC');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/ad/users', verificarToken, async (req, res) => {
+    const { username, display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos } = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO ad_user_extensions 
+            (username, display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [username.toLowerCase().trim(), display_name, email, ramal_voip, vpn_access, status_conta, desativar_em || null, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos]);
+        res.status(201).json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Usuário já existente ou parâmetros inválidos." }); }
+});
+
+app.put('/api/ad/users/:username', verificarToken, async (req, res) => {
+    const { username } = req.params;
+    const { display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos } = req.body;
+    try {
+        await pool.query(`
+            UPDATE ad_user_extensions SET 
+                display_name=$1, email=$2, ramal_voip=$3, vpn_access=$4, status_conta=$5, 
+                desativar_em=$6, trocar_senha_proximo_logon=$7, computadores_autorizados=$8, 
+                horarios_autorizados=$9, grupos=$10 
+            WHERE username=$11
+        `, [display_name, email, ramal_voip, vpn_access, status_conta, desativar_em || null, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos, username]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/ad/users/:username', verificarToken, async (req, res) => {
+    const { username } = req.params;
+    try {
+        await pool.query('DELETE FROM ad_user_extensions WHERE username = $1', [username]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ENDPOINTS PADRÕES DO SISTEMA RESGATADOS
 app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     const { new_password } = req.body;
     if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva do administrador.' });
-
     try {
         const newHash = gerarHash(new_password);
         await pool.query('UPDATE siem_local_users SET password_hash = $1, force_change = FALSE WHERE username = \'ADMIN\'', [newHash]);
@@ -176,9 +260,7 @@ app.get('/api/settings', verificarToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM system_settings');
         const config = {};
-        result.rows.forEach(row => { 
-            config[row.key] = row.key === 'ad_pass' ? '********' : row.value; 
-        });
+        result.rows.forEach(row => { config[row.key] = row.key === 'ad_pass' ? '********' : row.value; });
         res.json(config);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -221,28 +303,14 @@ syslogServer.on('message', async (msg) => {
 });
 syslogServer.bind(514);
 
-app.post('/api/ad/logon', async (req, res) => {
-    const { username, computer_name, ip } = req.body;
-    try {
-        await chClient.insert({
-            table: 'default.ad_logons',
-            values: [{ timestamp: new Date().toISOString().slice(0,19).replace('T', ' '), username: username.toUpperCase(), computer_name: computer_name.toUpperCase(), ip }],
-            format: 'JSONEachRow'
-        });
-        res.status(201).json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.get('/api/logs', verificarToken, async (req, res) => {
-    let { page = 1, limit = 500, search = '', status = '' } = req.query;
+    let { page = 1, limit = 50, search = '', status = '' } = req.query;
     page = parseInt(page); limit = parseInt(limit);
     const offset = (page - 1) * limit;
-
     let filtros = ['1=1'];
     if (search) filtros.push(`(domain LIKE '%${search}%' OR ip LIKE '%${search}%')`);
     if (status) filtros.push(`status = '${status}'`);
     const whereClause = filtros.join(' AND ');
-
     try {
         const query = `
             SELECT 
@@ -251,11 +319,9 @@ app.get('/api/logs', verificarToken, async (req, res) => {
                 coalesce((SELECT username FROM default.ad_logons WHERE ip = dns_logs.ip AND timestamp <= dns_logs.timestamp ORDER BY timestamp DESC LIMIT 1), if(ip LIKE '172.16.24.%', 'MÓVEL / BYOD', '-')) as usuario
             FROM default.dns_logs WHERE ${whereClause} ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}
         `;
-        
         const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}`, format: 'JSONEachRow' });
         const totalRows = await totalResult.json();
         const total = totalRows[0] ? parseInt(totalRows[0].count) : 0;
-
         const dataResult = await chClient.query({ query: query, format: 'JSONEachRow' });
         const data = await dataResult.json();
         res.json({ total, page, limit, data });
@@ -268,5 +334,5 @@ const sslOptions = {
 };
 
 https.createServer(sslOptions, app).listen(8443, () => {
-    console.log("🚀 [SIEM] Servidor HTTPS Protegido Ativo na porta 8443!");
+    console.log("🚀 [SIEM] Servidor HTTPS Ativo na porta 8443!");
 });

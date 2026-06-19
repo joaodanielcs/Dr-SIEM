@@ -1,30 +1,23 @@
 #!/bin/bash
 
-# ==============================================================================
-#  SIEM - Dr.monitora // AUTOMATED SILENT BOOTSTRAP (CLEAN OUTPUT)
-# ==============================================================================
-
-# 1. Validação de privilégios de segurança
 if [ "$EUID" -ne 0 ]; then
   echo "❌ Erro de Segurança: Este script precisa ser executado como root ou com sudo."
   exit 1
 fi
 
-# 2. Instalação do motor Docker e Compose oficiais do Debian 13
 if ! command -v docker &> /dev/null; then
-    echo "📦 Preparando ambiente e instalando Docker / Docker Compose nativos..."
+    echo "📦 Preparando ambiente e Pipeline do Docker..."
     apt-get update -y > /dev/null 2>&1
     apt-get install -y docker.io docker-compose openssl ca-certificates curl > /dev/null 2>&1
     systemctl enable docker > /dev/null 2>&1
     systemctl start docker > /dev/null 2>&1
-    echo "✓ Engine do Docker ativada com sucesso!"
+    echo "✓ Engine do Docker ativada!"
 else
-    echo "✓ Engine do Docker já validada no sistema."
+    echo "✓ Engine do Docker já validada."
 fi
 
-# 3. Fabricação de chaves TLS locais para HTTPS interno (Zero Trust)
 if [ ! -d certs ]; then
-    echo "🔐 Gerando Certificado SSL Autoassinado para comunicação HTTPS interna..."
+    echo "🔐 Gerando Certificado SSL Autoassinado para comunicação HTTPS..."
     mkdir -p certs
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
       -keyout certs/server.key \
@@ -34,7 +27,6 @@ if [ ! -d certs ]; then
     echo "✓ Certificados SSL internos gerados!"
 fi
 
-# 4. Geração Dinâmica do Arquivo .env com credenciais de alta entropia
 if [ ! -f .env ]; then
     echo "🔒 Provisionando senhas aleatórias seguras para o banco de dados..."
     SENHA_BANCO_ALEATORIA=$(openssl rand -base64 18)
@@ -49,10 +41,9 @@ EOF
     chmod 600 .env > /dev/null 2>&1
     echo "✓ Arquivo .env protegido gerado!"
 else
-    echo "✓ Arquivo .env existente detectado. Mantendo configurações."
+    echo "✓ Arquivo .env existente detectado."
 fi
 
-# 5. Configuração do Serviço de Persistência Systemd (Para o boot do hardware)
 echo "⚙️ Configurando serviço Systemd para persistência pós-reboot..."
 DIR_ATUAL=$(pwd)
 
@@ -76,14 +67,13 @@ EOF
 
 systemctl daemon-reload > /dev/null 2>&1
 systemctl enable dr-siem.service > /dev/null 2>&1
-echo "✓ Serviço dr-siem.service registrado e habilitado no boot!"
+echo "✓ Serviço dr-siem.service registrado!"
 
-# 6. Inicialização Silenciosa da Stack Docker
-echo "🚀 Subindo a stack do SIEM em segundo plano (Aguarde alguns instantes)..."
+echo "🚀 Subindo os containers do SIEM (Aguarde alguns instantes)..."
 docker compose up -d > /dev/null 2>&1
 
 echo "=============================================================================="
 echo "🎯 [SIEM - Dr.monitora] INFRAESTRUTURA ONLINE!"
-echo "🌐 Acesse: HTTPS na porta 443 do servidor (https://192.168.5.191)"
+echo "🌐 Acesse: HTTPS na porta 443 do servidor"
 echo "🔑 Login inicial temporário: admin / admin"
 echo "=============================================================================="

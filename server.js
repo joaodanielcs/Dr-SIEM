@@ -6,7 +6,8 @@ const ActiveDirectory = require('activedirectory2');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
-const http = require('http');
+const https = require('https');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
@@ -120,7 +121,7 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ error: 'O sistema ainda não foi integrado ao Active Directory.' });
         }
 
-        // INTEGRAÇÃO INTELIGENTE: O sistema monta as strings chatas do LDAP sozinho por baixo dos panos
+        // Sistema monta as strings LDAP sozinho omitindo caminhos complexos do frontend
         const computedBaseDN = config.ad_domain.split('.').map(part => `DC=${part}`).join(',');
         const computedBindUser = `${config.ad_user}@${config.ad_domain}`;
 
@@ -251,7 +252,12 @@ app.get('/api/logs', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Inicialização em HTTP Puro (Tráfego seguro gerenciado externamente pelo NPM)
-http.createServer(app).listen(8080, () => {
-    console.log("🚀 [SIEM] Servidor HTTP Ativo na porta 8080!");
+// Inicialização travada em HTTPS usando as chaves locais geradas pelo setup
+const sslOptions = {
+    key: fs.readFileSync(path.join(__dirname, 'certs/server.key')),
+    cert: fs.readFileSync(path.join(__dirname, 'certs/server.crt'))
+};
+
+https.createServer(sslOptions, app).listen(8443, () => {
+    console.log("🚀 [SIEM] Servidor HTTPS Protegido Ativo na porta 8443!");
 });

@@ -79,35 +79,17 @@ async function initDatabases() {
             );
         `);
 
-        // TABELA DE GOVERNANÇA DE IDENTIDADES E METADADOS DO AD
+        // Extensões de metadados locais complementares ao AD
         await pgClient.query(`
             CREATE TABLE IF NOT EXISTS ad_user_extensions (
                 username VARCHAR(100) PRIMARY KEY,
-                display_name VARCHAR(150),
-                email VARCHAR(250),
                 ramal_voip VARCHAR(20),
                 vpn_access BOOLEAN DEFAULT FALSE,
-                status_conta BOOLEAN DEFAULT TRUE,
                 desativar_em TIMESTAMPTZ,
-                trocar_senha_proximo_logon BOOLEAN DEFAULT FALSE,
-                computadores_autorizados TEXT,
-                horarios_autorizados TEXT,
-                grupos TEXT
+                computadores_autorizados TEXT DEFAULT '*',
+                horarios_autorizados TEXT DEFAULT '24H'
             );
         `);
-
-        // INJEÇÃO DAY-0: Alimenta usuários fictícios para homologação imediata da interface
-        const mockCheck = await pgClient.query('SELECT count(*) FROM ad_user_extensions');
-        if (parseInt(mockCheck.rows[0].count) === 0) {
-            await pgClient.query(`
-                INSERT INTO ad_user_extensions (username, display_name, email, ramal_voip, vpn_access, status_conta, grupos, computadores_autorizados, horarios_autorizados) VALUES 
-                ('joao.silva', 'João Silva', 'joao.silva@empresa.local', '4001', true, true, 'SIEM_OPERADORES,TI_INFRA', 'SRV-SOC-01,ST-TI-04', '08:00-18:00'),
-                ('maria.souza', 'Maria Souza', 'maria.souza@empresa.local', '4002', false, true, 'TI_SUPORTE', '*', '08:00-22:00'),
-                ('diretor.teste', 'Diretor Teste', 'diretor@empresa.local', '1000', true, false, 'DIRETORIA', '*', '24H');
-            `);
-            console.log("✓ [DAY-0] Carga inicial de usuários simulados do AD injetada.");
-        }
-
     } catch (err) {
         console.error("🔴 Erro ao subir tabelas locais:", err);
     } finally { pgClient.release(); }
@@ -119,16 +101,12 @@ async function initDatabases() {
 }
 setTimeout(initDatabases, 5000);
 
-// CRON DE AGENDAMENTO: Desativa contas do AD na data/hora programada pelo painel
-async function verificarAgendamentosDesativacao() {
+// CRON: Varre agendamentos locais para marcar desativações pendentes
+setInterval(async () => {
     try {
-        const res = await pool.query("UPDATE ad_user_extensions SET status_conta = FALSE, desativar_em = NULL WHERE desativar_em <= NOW() AND status_conta = TRUE RETURNING username");
-        res.rows.forEach(row => {
-            console.log(`🔒 [SIEM GOVERNANCE] Conta do usuário '${row.username}' foi DESATIVADA automaticamente via agendamento.`);
-        });
-    } catch (err) { console.error("Erro no cron de desativação:", err); }
-}
-setInterval(verificarAgendamentosDesativacao, 30000); // Executa a cada 30 segundos
+        await pool.query("UPDATE ad_user_extensions SET desativar_em = NULL WHERE desativar_em <= NOW()");
+    } catch (err) {}
+}, 60000);
 
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
@@ -163,7 +141,7 @@ app.post('/api/auth/login', async (req, res) => {
         } catch (err) { return res.status(500).json({ error: err.message }); }
     }
 
-    // Autenticação de Operadores via AD Real
+    // Login de operador via AD
     try {
         const settingsRes = await pool.query('SELECT * FROM system_settings');
         const config = {};
@@ -202,37 +180,104 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ENDPOINTS DO MÓDULO DE USUÁRIOS DO ACTIVE DIRECTORY
+// 🔍 BUSCA EM TEMPO REAL NO SEU ACTIVE DIRECTORY (LDAP SEARCH NATIVO)
 app.get('/api/ad/users', verificarToken, async (req, res) => {
     try {
-        const result = await pool.query('SELECT username, display_name, email, ramal_voip, vpn_access, status_conta, to_char(desativar_em, \'YYYY-MM-DD"T"HH24:MI\') as desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos FROM ad_user_extensions ORDER BY display_name ASC');
-        res.json(result.rows);
+        const settingsRes = await pool.query('SELECT * FROM system_settings');
+        const config = {};
+        settingsRes.rows.forEach(row => { config[row.key] = row.value; });
+
+        if (!config.ad_ip || !config.ad_domain) {
+            return res.json([]); // Retorna vazio se a infraestrutura não foi configurada ainda
+        }
+
+        const computedBaseDN = config.ad_domain.split('.').map(part => `DC=${part}`).join(',');
+        const computedBindUser = `${config.ad_user}@${config.ad_domain}`;
+
+        const adConfig = {
+            url: `ldap://${config.ad_ip}:389`,
+            baseDN: computedBaseDN,
+            username: computedBindUser,
+            password: config.ad_pass,
+            attributes: {
+                user: ['displayName', 'sAMAccountName', 'mail', 'userAccountControl', 'memberOf']
+            }
+        };
+
+        const ad = new ActiveDirectory(adConfig);
+        
+        // Filtro nativo LDAP para capturar contas de usuários reais excluindo contas de sistema construídas
+        const searchFilter = '(&(objectCategory=person)(objectClass=user)(!(sAMAccountName=krbtgt))(!(sAMAccountName=Guest)))';
+
+        ad.findUsers(searchFilter, true, async (err, adUsers) => {
+            if (err) {
+                return res.status(500).json({ error: `Falha de comunicação LDAP com ${config.ad_ip}: ${err.message}` });
+            }
+            if (!adUsers || adUsers.length === 0) {
+                return res.json([]);
+            }
+
+            // Puxa as extensões locais salvas no Postgres para consolidar a resposta híbrida
+            const localExts = await pool.query("SELECT * FROM ad_user_extensions");
+            const extMap = {};
+            localExts.rows.forEach(r => { extMap[r.username] = r; });
+
+            const finalUsers = adUsers.map(u => {
+                const usernameLower = (u.sAMAccountName || '').toLowerCase();
+                const ext = extMap[usernameLower] || {};
+                
+                // Bitmask do Active Directory: 0x02 identifica conta desativada (ACCOUNTDISABLE)
+                const uac = u.userAccountControl || 0;
+                const activeStatus = !(uac & 2);
+
+                const groupsList = Array.isArray(u.memberOf)
+                    ? u.memberOf.map(g => g.split(',')[0].replace('CN=', '')).join(', ')
+                    : (u.memberOf ? u.memberOf.split(',')[0].replace('CN=', '') : '');
+
+                return {
+                    username: usernameLower,
+                    display_name: u.displayName || u.sAMAccountName,
+                    email: u.mail || '',
+                    ramal_voip: ext.ramal_voip || '',
+                    vpn_access: ext.vpn_access || false,
+                    status_conta: activeStatus,
+                    desativar_em: ext.desativar_em ? ext.desativar_em.toISOString().slice(0,16) : '',
+                    computadores_autorizados: ext.computadores_autorizados || '*',
+                    horarios_autorizados: ext.horarios_autorizados || '24H',
+                    grupos: groupsList,
+                    trocar_senha_proximo_logon: !!(uac & 0x0080) // Bit 0x0080 indica password expired/must change
+                };
+            });
+
+            res.json(finalUsers);
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// INTERCEPTADORES DOS COMANDOS DE ESCRITA (PERSISTEM AS DIRETRIZES DE METADADOS)
 app.post('/api/ad/users', verificarToken, async (req, res) => {
-    const { username, display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos } = req.body;
+    const { username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados } = req.body;
     try {
         await pool.query(`
-            INSERT INTO ad_user_extensions 
-            (username, display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        `, [username.toLowerCase().trim(), display_name, email, ramal_voip, vpn_access, status_conta, desativar_em || null, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos]);
-        res.status(201).json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Usuário já existente ou parâmetros inválidos." }); }
+            INSERT INTO ad_user_extensions (username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (username) DO UPDATE SET 
+                ramal_voip=$2, vpn_access=$3, desativar_em=$4, computadores_autorizados=$5, horarios_autorizados=$6
+        `, [username.toLowerCase().trim(), ramal_voip, vpn_access, desativar_em || null, computadores_autorizados, horarios_autorizados]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/ad/users/:username', verificarToken, async (req, res) => {
     const { username } = req.params;
-    const { display_name, email, ramal_voip, vpn_access, status_conta, desativar_em, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos } = req.body;
+    const { ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados } = req.body;
     try {
         await pool.query(`
-            UPDATE ad_user_extensions SET 
-                display_name=$1, email=$2, ramal_voip=$3, vpn_access=$4, status_conta=$5, 
-                desativar_em=$6, trocar_senha_proximo_logon=$7, computadores_autorizados=$8, 
-                horarios_autorizados=$9, grupos=$10 
-            WHERE username=$11
-        `, [display_name, email, ramal_voip, vpn_access, status_conta, desativar_em || null, trocar_senha_proximo_logon, computadores_autorizados, horarios_autorizados, grupos, username]);
+            INSERT INTO ad_user_extensions (username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (username) DO UPDATE SET 
+                ramal_voip=$2, vpn_access=$3, desativar_em=$4, computadores_autorizados=$5, horarios_autorizados=$6
+        `, [username.toLowerCase(), ramal_voip, vpn_access, desativar_em || null, computadores_autorizados, horarios_autorizados]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -245,10 +290,9 @@ app.delete('/api/ad/users/:username', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ENDPOINTS PADRÕES DO SISTEMA RESGATADOS
 app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     const { new_password } = req.body;
-    if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva do administrador.' });
+    if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva.' });
     try {
         const newHash = gerarHash(new_password);
         await pool.query('UPDATE siem_local_users SET password_hash = $1, force_change = FALSE WHERE username = \'ADMIN\'', [newHash]);

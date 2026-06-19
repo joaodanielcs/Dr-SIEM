@@ -49,12 +49,15 @@
             margin-bottom: 20px;
         }
         label {
-            display: block;
+            display: flex;
+            align-items: flex-end; /* Alinha a base dos textos dos labels */
             margin-bottom: 8px;
             font-size: 12px;
             font-weight: bold;
             color: #a3b2c1;
             text-transform: uppercase;
+            min-height: 32px; /* Força labels de 1 ou 2 linhas a ocuparem o mesmo espaço */
+            box-sizing: border-box;
         }
         input {
             width: 100%;

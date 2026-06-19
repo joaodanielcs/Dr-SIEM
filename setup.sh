@@ -22,7 +22,7 @@ else
     echo "✓ Engine do Docker já validada."
 fi
 
-# 3. Fabricação das chaves SSL obrigatórias para o bindi do HTTPS interno
+# 3. Fabricação das chaves SSL obrigatórias para o bind do HTTPS interno
 if [ ! -d certs ]; then
     echo "🔐 Gerando chaves SSL internas para sustentação do protocolo HTTPS..."
     mkdir -p certs

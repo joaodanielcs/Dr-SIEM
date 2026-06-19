@@ -14,6 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Inicialização da conexão com o banco PostgreSQL usando as variáveis do .env
 const pool = new Pool({
     host: process.env.PG_HOST,
     user: process.env.PG_USER,
@@ -22,16 +23,19 @@ const pool = new Pool({
     port: 5432,
 });
 
+// Inicialização da conexão com o banco ClickHouse
 const chClient = createClient({
     url: process.env.CH_HOST,
     username: 'default',
     password: '',
 });
 
+// Função interna de hash para validação do usuário Day-0
 function gerarHash(senha) {
     return crypto.createHash('sha256').update(senha).digest('hex');
 }
 
+// Middleware de validação de sessão em tabelas relacionais
 function verificarToken(req, res, next) {
     const token = req.headers['authorization'];
     if (!token) return res.status(401).json({ error: 'Autenticação pendente.' });
@@ -44,6 +48,7 @@ function verificarToken(req, res, next) {
     });
 }
 
+// Provisionamento Day-0 de tabelas e injeção do usuário mestre temporário
 async function initDatabases() {
     const pgClient = await pool.connect();
     try {
@@ -89,6 +94,7 @@ async function initDatabases() {
 }
 setTimeout(initDatabases, 5000);
 
+// Endpoint Híbrido de Autenticação (Local Admin / Active Directory)
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     const userUpper = username.toUpperCase();
@@ -148,6 +154,7 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Endpoint para troca obrigatória de senha do ADMIN local
 app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     const { new_password } = req.body;
     if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva do administrador.' });
@@ -159,6 +166,7 @@ app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Obter configurações de infraestrutura
 app.get('/api/settings', verificarToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM system_settings');
@@ -170,6 +178,7 @@ app.get('/api/settings', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Salvar configurações de infraestrutura
 app.post('/api/settings', verificarToken, async (req, res) => {
     if (req.usuarioRole !== 'ADMIN') return res.status(403).json({ error: 'Apenas administradores podem alterar a infraestrutura.' });
     const configs = req.body;
@@ -182,12 +191,14 @@ app.post('/api/settings', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Revogação de Token (Logout)
 app.post('/api/auth/logout', verificarToken, async (req, res) => {
     const token = req.headers['authorization'];
     await pool.query('DELETE FROM siem_sessions WHERE token = $1', [token]);
     res.json({ success: true });
 });
 
+// Receptor do Motor Syslog Nativo (Porta 514 UDP) para os Pi-Holes
 const syslogServer = dgram.createSocket('udp4');
 syslogServer.on('message', async (msg) => {
     const logLinha = msg.toString();
@@ -208,6 +219,7 @@ syslogServer.on('message', async (msg) => {
 });
 syslogServer.bind(514);
 
+// Webhook para Ingestão de Logons do Windows Active Directory (Nativo via PowerShell)
 app.post('/api/ad/logon', async (req, res) => {
     const { username, computer_name, ip } = req.body;
     try {
@@ -220,6 +232,7 @@ app.post('/api/ad/logon', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Endpoint Correlacionador Inteligente de Logs Massivos (ClickHouse)
 app.get('/api/logs', verificarToken, async (req, res) => {
     let { page = 1, limit = 500, search = '', status = '' } = req.query;
     page = parseInt(page); limit = parseInt(limit);
@@ -238,7 +251,9 @@ app.get('/api/logs', verificarToken, async (req, res) => {
                 coalesce((SELECT username FROM default.ad_logons WHERE ip = dns_logs.ip AND timestamp <= dns_logs.timestamp ORDER BY timestamp DESC LIMIT 1), if(ip LIKE '172.16.24.%', 'MÓVEL / BYOD', '-')) as usuario
             FROM default.dns_logs WHERE ${whereClause} ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}
         `;
-        const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}', format: 'JSONEachRow' });
+        
+        // CORREÇÃO CIRÚRGICA DE SINTAXE REALIZADA AQUI:
+        const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}`, format: 'JSONEachRow' });
         const totalRows = await totalResult.json();
         const total = totalRows[0] ? parseInt(totalRows[0].count) : 0;
 
@@ -248,6 +263,7 @@ app.get('/api/logs', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Configurações do canal de criptografia HTTPS nativo do painel
 const sslOptions = {
     key: fs.readFileSync(path.join(__dirname, 'certs/server.key')),
     cert: fs.readFileSync(path.join(__dirname, 'certs/server.crt'))

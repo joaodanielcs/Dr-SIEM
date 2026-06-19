@@ -3,246 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIEM - Dr.monitora</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>SIEM // DR.MONITORA</title>
+    <style>
+        :root {
+            --bg-color: #1a2332;
+            --card-color: #242f41;
+            --text-color: #ffffff;
+            --accent-color: #1abc9c;
+            --error-color: #e74c3c;
+            --input-bg: #151d2a;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: var(--card-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 450px;
+            box-sizing: border-box;
+        }
+        h2 {
+            text-align: center;
+            color: var(--accent-color);
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #8a9ba8;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #a3b2c1;
+            text-transform: uppercase;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #34495e;
+            background-color: var(--input-bg);
+            color: white;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        input:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #16a085;
+        }
+        .error-box {
+            background-color: rgba(231, 76, 60, 0.15);
+            border: 1px solid var(--error-color);
+            color: #ff7675;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+        }
+        .screen { display: none; }
+        .active { display: block; }
+        .ad-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .full-width { grid-column: span 2; }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+<body>
 
-    <div id="view-login" class="flex flex-col items-center justify-center min-h-screen p-4">
-        <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-mono font-bold text-teal-400 mb-2 text-center">SIEM // DR.MONITORA</h2>
-            <p class="text-xs text-gray-400 text-center uppercase tracking-wider mb-6">Autenticação do Sistema</p>
-            <div id="login-error" class="bg-red-950/50 border border-red-700 text-red-400 text-xs p-3 rounded mb-4 hidden font-bold"></div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Usuário / Domínio</label>
-                    <input type="text" id="username" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-teal-400 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Chave de Acesso</label>
-                    <input type="password" id="password" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-teal-400 outline-none">
-                </div>
-                <button onclick="realizarLogin()" class="w-full bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold py-2.5 rounded-lg text-sm font-mono uppercase tracking-wider transition">Autenticar</button>
+    <div id="login-screen" class="container screen active">
+        <h2>SIEM // DR.MONITORA</h2>
+        <div class="subtitle">Autenticação do Sistema</div>
+        <div id="login-error" class="error-box"></div>
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label>Usuário / Domínio</label>
+                <input type="text" id="username" placeholder="Ex: admin ou usuario" required autocomplete="username">
             </div>
-        </div>
+            <div class="form-group">
+                <label>Chave de Acesso</label>
+                <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <button type="submit">Autenticar</button>
+        </form>
     </div>
 
-    <div id="view-force-password" class="flex flex-col items-center justify-center min-h-screen p-4 hidden">
-        <div class="bg-gray-800 p-8 rounded-xl border border-yellow-600/50 w-full max-w-md shadow-2xl">
-            <h2 class="text-lg font-bold text-yellow-500 mb-1 font-mono uppercase">⚠️ Primeiro Acesso Detectado</h2>
-            <p class="text-xs text-gray-400 mb-6">Por motivos de Segurança da Informação, altere a senha padrão do usuário ADMIN antes de continuar.</p>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nova Senha Corporativa Forte</label>
-                    <input type="password" id="new-password" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-teal-400 outline-none">
-                </div>
-                <button onclick="salvarNovaSenha()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2.5 rounded-lg text-sm font-mono uppercase transition">Definir Nova Senha</button>
+    <div id="password-screen" class="container screen">
+        <h2>REDEFINIR ACESSO</h2>
+        <div class="subtitle">Primeiro acesso detectado. Altere a senha do ADMIN.</div>
+        <div id="pass-error" class="error-box"></div>
+        <form onsubmit="handleChangePassword(event)">
+            <div class="form-group">
+                <label>Nova Senha Corporativa</label>
+                <input type="password" id="new-password" placeholder="Mínimo 8 caracteres" required minlength="8">
             </div>
-        </div>
+            <button type="submit">Gravar Nova Senha</button>
+        </form>
     </div>
 
-    <div id="view-dashboard" class="hidden">
-        <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-md flex justify-between items-center">
-            <div class="flex items-center space-x-6">
-                <h1 class="text-lg font-bold text-teal-400 font-mono">SIEM // DR.MONITORA</h1>
-                <nav class="flex space-x-4">
-                    <button onclick="mudarAba('dashboard')" id="nav-dash" class="text-sm font-bold border-b-2 border-teal-400 text-white px-2 py-1">Dashboard</button>
-                    <button onclick="mudarAba('config')" id="nav-config" class="text-sm font-bold text-gray-400 hover:text-white px-2 py-1">Configurações do AD</button>
-                </nav>
+    <div id="settings-screen" class="container screen" style="max-width: 600px;">
+        <h2>INTEGRAÇÃO COM ACTIVE DIRECTORY</h2>
+        <div class="subtitle">Painel de Controle de Identidades</div>
+        <div id="settings-msg" class="error-box" style="border-color: var(--accent-color); color: var(--accent-color); background: rgba(26,188,156,0.1)"></div>
+        <form onsubmit="handleSaveSettings(event)" class="ad-grid">
+            <div class="form-group">
+                <label>IP do Controlador de Domínio (AD)</label>
+                <input type="text" id="ad-ip" placeholder="Ex: 10.0.0.10" required>
             </div>
-            <button onclick="realizarLogout()" class="text-xs bg-gray-700 hover:bg-red-900 border border-gray-600 px-3 py-1.5 rounded-lg font-bold transition">Sair</button>
-        </header>
-
-        <div id="tab-dashboard" class="container mx-auto p-6">
-            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 mb-6 flex space-x-4 items-end shadow-lg">
-                <div class="flex-1">
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Busca Global (Site ou IP)</label>
-                    <input type="text" id="search" placeholder="Ex: futemax.eus, 192.168.0.39..." class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 outline-none focus:border-teal-400">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Ação</label>
-                    <select id="status" class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:border-teal-400">
-                        <option value="">Todos</option><option value="PERMITIDO">ALLOWED</option><option value="BLOQUEADO">BLOCKED</option>
-                    </select>
-                </div>
-                <button onclick="carregarLogs(1)" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold px-8 py-2 rounded-lg text-sm transition">Pesquisar</button>
-                <select id="limit" onchange="carregarLogs(1)" class="bg-gray-900 border border-gray-600 rounded-lg px-2 py-1 text-sm text-gray-300 outline-none"><option value="50">50</option><option value="100">100</option><option value="200">200</option><option value="500" selected>500</option><option value="1000">1000</option></select>
+            <div class="form-group">
+                <label>Domínio Principal</label>
+                <input type="text" id="ad-domain" placeholder="Ex: empresa.local" required>
             </div>
-
-            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-700/50 text-xs font-bold uppercase text-gray-400 border-b border-gray-700 tracking-wider"><th class="p-4">Data / Hora</th><th class="p-4">Usuário</th><th class="p-4">Estação [IP]</th><th class="p-4">Domínio</th><th class="p-4 text-center">Ação</th></tr>
-                    </thead>
-                    <tbody id="tabela-dados" class="text-sm divide-y divide-gray-700/60 font-mono"></tbody>
-                </table>
+            <div class="form-group">
+                <label>Usuário de Serviço (sAMAccountName)</label>
+                <input type="text" id="ad-user" placeholder="Ex: svc_siem" required>
             </div>
-            <div class="flex justify-between items-center mt-4 text-xs text-gray-400 font-bold uppercase" id="contador-total"></div>
-        </div>
-
-        <div id="tab-config" class="container mx-auto p-6 hidden max-w-3xl">
-            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-2xl space-y-6">
-                <h3 class="text-lg font-bold text-teal-400 font-mono border-b border-gray-700 pb-2">INTEGRAÇÃO COM O ACTIVE DIRECTORY</h3>
-                <div id="config-success" class="bg-emerald-950/40 border border-green-700 text-green-400 text-xs p-3 rounded hidden font-bold">✓ Configurações salvas. Os usuários do grupo AD já podem realizar login!</div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Caminho LDAP (AD Server URL)</label>
-                        <input type="text" id="cfg-ad-url" placeholder="ldap://192.168.0.1:389" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-teal-400 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Base DN do Domínio</label>
-                        <input type="text" id="cfg-ad-base" placeholder="DC=drmonitoracorp,DC=com" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-teal-400 outline-none">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Usuário de Serviço (Distinguished Name)</label>
-                        <input type="text" id="cfg-ad-user" placeholder="CN=SiemUser,OU=Service,DC=domain..." class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-teal-400 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Senha do Usuário de Serviço</label>
-                        <input type="password" id="cfg-ad-pass" placeholder="********" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-teal-400 outline-none">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Grupo do AD com Permissão de Acesso</label>
-                    <input type="text" id="cfg-ad-group" placeholder="Ex: SIEM" class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm focus:border-teal-400 outline-none font-bold text-teal-400">
-                </div>
-                <button onclick="salvarConfiguracoes()" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold px-6 py-2.5 rounded-lg text-sm font-mono uppercase tracking-wider transition">Salvar e Ativar Conexão</button>
+            <div class="form-group">
+                <label>Senha do Usuário</label>
+                <input type="password" id="ad-pass" placeholder="••••••••" required>
             </div>
-        </div>
+            <div class="form-group full-width">
+                <label>Grupo do AD com Permissão de Acesso</label>
+                <input type="text" id="ad-group" placeholder="Ex: GG_SIEM_OPERADORES" required>
+            </div>
+            <button type="submit" class="full-width">Salvar e Ativar Conexão</button>
+        </form>
     </div>
 
     <script>
-        let paginaAtual = 1;
+        let sessionToken = '';
 
-        function verificarFluxoTela(token, forceChange) {
-            document.getElementById('view-login').classList.add('hidden');
-            document.getElementById('view-force-password').classList.add('hidden');
-            document.getElementById('view-dashboard').classList.add('hidden');
-
-            if (!token) {
-                document.getElementById('view-login').classList.remove('hidden');
-            } else if (forceChange) {
-                document.getElementById('view-force-password').classList.remove('hidden');
-            } else {
-                document.getElementById('view-dashboard').classList.remove('hidden');
-                carregarLogs(1);
-                carregarConfiguracoes();
-            }
+        function showError(elementId, msg) {
+            const box = document.getElementById(elementId);
+            box.innerText = msg;
+            box.style.display = 'block';
         }
 
-        async function realizarLogin() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            const errDiv = document.getElementById('login-error');
-
+        async function handleLogin(e) {
+            e.preventDefault();
+            document.getElementById('login-error').style.display = 'none';
+            
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: user, password: pass })
+                body: JSON.stringify({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                })
             });
-
+            
             const data = await res.json();
-            if (res.ok) {
-                localStorage.setItem('siem_token', data.token);
-                localStorage.setItem('siem_force', data.force_change ? 'true' : 'false');
-                errDiv.classList.add('hidden');
-                verificarFluxoTela(data.token, data.force_change);
+            if(!res.ok) return showError('login-error', data.error);
+
+            sessionToken = data.token;
+            
+            if(data.force_change) {
+                document.getElementById('login-screen').classList.remove('active');
+                document.getElementById('password-screen').classList.add('active');
             } else {
-                errDiv.innerText = data.error;
-                errDiv.classList.remove('hidden');
+                showSettingsScreen();
             }
         }
 
-        async function salvarNovaSenha() {
-            const newPass = document.getElementById('new-password').value;
+        async function handleChangePassword(e) {
+            e.preventDefault();
+            document.getElementById('pass-error').style.display = 'none';
+
             const res = await fetch('/api/auth/change-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('siem_token') },
-                body: JSON.stringify({ new_password: newPass })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': sessionToken
+                },
+                body: JSON.stringify({ new_password: document.getElementById('new-password').value })
             });
 
-            if (res.ok) {
-                localStorage.setItem('siem_force', 'false');
-                verificarFluxoTela(localStorage.getItem('siem_token'), false);
+            if(!res.ok) {
+                const data = await res.json();
+                return showError('pass-error', data.error);
+            }
+
+            showSettingsScreen();
+        }
+
+        async function showSettingsScreen() {
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('password-screen').classList.remove('active');
+            document.getElementById('settings-screen').classList.add('active');
+
+            const res = await fetch('/api/settings', {
+                headers: { 'Authorization': sessionToken }
+            });
+            if(res.ok) {
+                const config = await res.json();
+                if(config.ad_ip) document.getElementById('ad-ip').value = config.ad_ip;
+                if(config.ad_domain) document.getElementById('ad-domain').value = config.ad_domain;
+                if(config.ad_user) document.getElementById('ad-user').value = config.ad_user;
+                if(config.ad_pass) document.getElementById('ad-pass').value = config.ad_pass;
+                if(config.ad_group) document.getElementById('ad-group').value = config.ad_group;
             }
         }
 
-        async function carregarConfiguracoes() {
-            const res = await fetch('/api/settings', { headers: { 'Authorization': localStorage.getItem('siem_token') } });
-            if (!res.ok) return;
-            const config = await res.json();
-            if(config.ad_url) document.getElementById('cfg-ad-url').value = config.ad_url;
-            if(config.ad_base_dn) document.getElementById('cfg-ad-base').value = config.ad_base_dn;
-            if(config.ad_user) document.getElementById('cfg-ad-user').value = config.ad_user;
-            if(config.ad_pass) document.getElementById('cfg-ad-pass').value = config.ad_pass;
-            if(config.ad_allowed_group) document.getElementById('cfg-ad-group').value = config.ad_allowed_group;
-        }
-
-        async function salvarConfiguracoes() {
-            const payload = {
-                ad_url: document.getElementById('cfg-ad-url').value,
-                ad_base_dn: document.getElementById('cfg-ad-base').value,
-                ad_user: document.getElementById('cfg-ad-user').value,
-                ad_pass: document.getElementById('cfg-ad-pass').value,
-                ad_allowed_group: document.getElementById('cfg-ad-group').value,
-            };
+        async function handleSaveSettings(e) {
+            e.preventDefault();
+            const msgBox = document.getElementById('settings-msg');
+            msgBox.style.display = 'none';
 
             const res = await fetch('/api/settings', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('siem_token') },
-                body: JSON.stringify(payload)
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': sessionToken
+                },
+                body: JSON.stringify({
+                    ad_ip: document.getElementById('ad-ip').value,
+                    ad_domain: document.getElementById('ad-domain').value,
+                    ad_user: document.getElementById('ad-user').value,
+                    ad_pass: document.getElementById('ad-pass').value,
+                    ad_group: document.getElementById('ad-group').value
+                })
             });
 
             if(res.ok) {
-                const s = document.getElementById('config-success');
-                s.classList.remove('hidden');
-                setTimeout(() => s.classList.add('hidden'), 4000);
-            }
-        }
-
-        async function realizarLogout() {
-            await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': localStorage.getItem('siem_token') } });
-            localStorage.clear();
-            verificarFluxoTela(null, false);
-        }
-
-        function mudarAba(aba) {
-            document.getElementById('tab-dashboard').classList.add('hidden');
-            document.getElementById('tab-config').classList.add('hidden');
-            if (aba === 'dashboard') {
-                document.getElementById('tab-dashboard').classList.remove('hidden');
+                msgBox.innerText = "✓ Configurações salvas! SIEM integrado ao AD com sucesso.";
+                msgBox.style.display = 'block';
             } else {
-                document.getElementById('tab-config').classList.remove('hidden');
+                const data = await res.json();
+                showError('settings-msg', data.error);
             }
         }
-
-        async function carregarLogs(pagina = 1) {
-            const search = document.getElementById('search').value;
-            const status = document.getElementById('status').value;
-            const limit = document.getElementById('limit').value;
-
-            const res = await fetch(`/api/logs?page=${pagina}&limit=${limit}&search=${search}&status=${status}`, {
-                headers: { 'Authorization': localStorage.getItem('siem_token') }
-            });
-            if(res.status === 403) return realizarLogout();
-            const json = await res.json();
-
-            const tbody = document.getElementById('tabela-dados');
-            tbody.innerHTML = '';
-            json.data.forEach(item => {
-                const badge = item.status === 'BLOQUEADO' ? '<span class="text-red-400 bg-red-950 px-2 py-0.5 rounded text-xs border border-red-800 font-bold">BLOCKED</span>' : '<span class="text-green-400 bg-emerald-950 px-2 py-0.5 rounded text-xs border border-green-800 font-bold">ALLOWED</span>';
-                tbody.innerHTML += `<tr><td class="p-4 text-gray-400 text-xs">${item.data_hora}</td><td class="p-4 font-bold text-teal-400">${item.usuario}</td><td class="p-4 text-xs text-gray-300">${item.hostname} <span class="text-gray-500">[${item.ip}]</span></td><td class="p-4">${item.domain}</td><td class="p-4 text-center">${badge}</td></tr>`;
-            });
-            document.getElementById('contador-total').innerText = `Total: ${json.total} // Página ${json.page}`;
-        }
-
-        // Inicialização
-        const token = localStorage.getItem('siem_token');
-        const force = localStorage.getItem('siem_force') === 'true';
-        verificarFluxoTela(token, force);
     </script>
 </body>
 </html>

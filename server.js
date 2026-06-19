@@ -102,10 +102,21 @@ app.post('/api/auth/login', async (req, res) => {
                 const token = crypto.randomBytes(32).toString('hex');
                 const forceChange = result.rows[0].force_change;
                 
+                // CHECAGEM INTELIGENTE DE DAY-0: O AD já foi integrado alguma vez?
+                const settingsCheck = await pool.query("SELECT 1 FROM system_settings WHERE key = 'ad_ip'");
+                const adConfigured = settingsCheck.rows.length > 0;
+                
                 await pool.query('INSERT INTO siem_sessions (token, username, role, expiracao) VALUES ($1, $2, $3, NOW() + INTERVAL \'2 hours\')', 
                     [token, 'ADMIN', 'ADMIN']);
                 
-                return res.json({ success: true, token, username: 'ADMIN', role: 'ADMIN', force_change: forceChange });
+                return res.json({ 
+                    success: true, 
+                    token, 
+                    username: 'ADMIN', 
+                    role: 'ADMIN', 
+                    force_change: forceChange,
+                    ad_configured: adConfigured // Envia a flag para o front decidir a tela
+                });
             } else {
                 return res.status(401).json({ error: 'Senha do administrador incorreta.' });
             }

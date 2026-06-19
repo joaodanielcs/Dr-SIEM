@@ -1,4 +1,3 @@
-
 services:
   relational_db:
     image: postgres:15-alpine

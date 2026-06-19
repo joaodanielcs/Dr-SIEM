@@ -196,7 +196,6 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
             username: computedBindUser,
             password: config.ad_pass,
             attributes: {
-                // CORREÇÃO CIRÚRGICA: dn e distinguishedName reinjetados para permitir a busca de grupos
                 user: ['dn', 'distinguishedName', 'displayName', 'sAMAccountName', 'mail', 'userAccountControl', 'memberOf']
             }
         };
@@ -263,7 +262,7 @@ app.put('/api/ad/users/:username', verificarToken, async (req, res) => {
     const { username } = req.params;
     const { ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados } = req.body;
     try {
-        await pool.query suicide(`
+        await pool.query(`
             INSERT INTO ad_user_extensions (username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (username) DO UPDATE SET 

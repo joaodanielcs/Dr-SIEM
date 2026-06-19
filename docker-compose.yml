@@ -1,19 +1,30 @@
 version: '3.8'
 
 services:
-  db:
+  # Banco relacional para usuários e configurações de infraestrutura
+  relational_db:
     image: postgres:15-alpine
-    container_name: dr_siem_db
+    container_name: dr_siem_pg
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - pg_data:/var/lib/postgresql/data
 
+  # O motor colunar de alta performance para os milhões de logs
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: dr_siem_clickhouse
+    restart: always
+    ports:
+      - "8123:8123"      # Interface HTTP para a aplicação Node.js
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+
+  # O cérebro do SIEM
   app:
     image: node:18-alpine
     container_name: dr_siem_backend
@@ -22,19 +33,22 @@ services:
     volumes:
       - ./:/usr/src/app
     ports:
-      - "8080:8080"      
-      - "514:514/udp"    
+      - "8080:8080"      # Interface Web
+      - "514:514/udp"    # Coletor Syslog UDP para os Pi-holes
     environment:
-      DB_HOST: db
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
+      PG_HOST: relational_db
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_NAME: ${POSTGRES_DB}
+      CH_HOST: http://clickhouse:8123
       INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:-admin}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin}
-      PORT: 8080
     depends_on:
-      - db
+      - relational_db
+      - clickhouse
     command: sh -c "npm install && node server.js"
 
 volumes:
-  postgres_data:
+  pg_data:
+  ch_data:
+  ch_logs:

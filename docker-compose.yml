@@ -30,16 +30,14 @@ services:
     volumes:
       - ./:/usr/src/app
     ports:
-      - "443:8443"       # ◄ MUDANÇA: Recebe HTTPS na 443 física e joga na 8443 HTTPS do Node
-      - "514:514/udp"    # Ingestão de logs dos Pi-holes
+      - "443:8443"       
+      - "514:514/udp"    
     environment:
       PG_HOST: relational_db
       PG_USER: ${POSTGRES_USER}
       PG_PASSWORD: ${POSTGRES_PASSWORD}
       PG_NAME: ${POSTGRES_DB}
       CH_HOST: http://clickhouse:8123
-      INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER}
-      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD}
     depends_on:
       - relational_db
       - clickhouse

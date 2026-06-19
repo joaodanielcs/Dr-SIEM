@@ -321,10 +321,8 @@
                 document.getElementById('login-screen').classList.remove('active');
                 document.getElementById('password-screen').classList.add('active');
             } else if(data.ad_configured) {
-                // FLUXO DE PRODUÇÃO: Se já tem AD configurado, vai direto para o painel de controle
                 showDashboardScreen();
             } else {
-                // FLUXO DE CORREÇÃO: Só exibe o setup se for o primeiro boot da usina (Day-0)
                 showSettingsScreen();
             }
         }
@@ -366,7 +364,7 @@
                 const config = await res.json();
                 if(config.ad_ip) {
                     document.getElementById('ad-ip').value = config.ad_ip;
-                    document.getElementById('btn-cancel-config').style.display = 'block'; // Mostra botão de voltar se já existir configuração
+                    document.getElementById('btn-cancel-config').style.display = 'block';
                 }
                 if(config.ad_domain) document.getElementById('ad-domain').value = config.ad_domain;
                 if(config.ad_user) document.getElementById('ad-user').value = config.ad_user;
@@ -406,7 +404,11 @@
         }
 
         function showDashboardScreen() {
+            // CORREÇÃO: Força a limpeza absoluta de todas as telas antes de carregar o painel
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('password-screen').classList.remove('active');
             document.getElementById('settings-screen').classList.remove('active');
+            
             document.body.style.alignItems = 'flex-start';
             document.getElementById('dashboard-screen').classList.add('active');
             loadLogs(1);

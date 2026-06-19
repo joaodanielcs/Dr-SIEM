@@ -15,10 +15,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const pool = new Pool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    host: process.env.PG_HOST,        // ◄ Alterado de DB_HOST
+    user: process.env.PG_USER,        // ◄ Alterado de DB_USER
+    password: process.env.PG_PASSWORD, // ◄ Alterado de DB_PASSWORD
+    database: process.env.PG_NAME,     // ◄ Alterado de DB_NAME
     port: 5432,
 });
 

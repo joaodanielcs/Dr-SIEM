@@ -30,7 +30,7 @@ services:
     volumes:
       - ./:/usr/src/app
     ports:
-      - "8080:8080"      
+      - "443:8080"      
       - "514:514/udp"    
     environment:
       PG_HOST: relational_db

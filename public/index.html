@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIEM - Dr.monitora // Governança de Acessos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+
+    <header class="bg-gray-800 border-b border-gray-700 p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <h1 class="text-lg font-bold tracking-wider text-teal-400 font-mono">SIEM // DR.MONITORA</h1>
+            </div>
+            <div class="text-xs text-gray-400 uppercase font-bold tracking-widest">Controle de Acessos e Identidade</div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-6">
+        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 mb-6 grid grid-cols-1 md:flex md:space-x-4 gap-4 items-end shadow-lg">
+            <div class="flex-1">
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-wider">Busca Global (Site ou IP)</label>
+                <input type="text" id="search" placeholder="Ex: futemax.eus, 192.168.0.39..." class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-teal-400 outline-none text-gray-100">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 tracking-wider">Filtro Policiamento</label>
+                <select id="status" class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none focus:border-teal-400">
+                    <option value="">Todos os Acessos</option>
+                    <option value="PERMITIDO">Apenas Permitidos</option>
+                    <option value="BLOQUEADO">Apenas Bloqueados</option>
+                </select>
+            </div>
+            <div>
+                <button onclick="carregarLogs(1)" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold px-8 py-2 rounded-lg text-sm transition duration-200 shadow-md">Pesquisar</button>
+            </div>
+            <div class="ml-auto flex items-center space-x-2">
+                <span class="text-xs text-gray-400 font-bold uppercase tracking-wider">Exibir por página:</span>
+                <select id="limit" onchange="carregarLogs(1)" class="bg-gray-900 border border-gray-600 rounded-lg px-2 py-1 text-sm outline-none text-gray-300">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500" selected>500</option>
+                    <option value="1000">1000</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-700/50 text-xs font-bold uppercase text-gray-400 border-b border-gray-700 tracking-wider">
+                        <th class="p-4">Data / Hora</th>
+                        <th class="p-4">Usuário Autenticado</th>
+                        <th class="p-4">Estação de Trabalho [IP]</th>
+                        <th class="p-4">Alvo da Consulta (Domínio)</th>
+                        <th class="p-4 text-center">Ação do Firewall</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-dados" class="text-sm divide-y divide-gray-700/60 font-mono">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="flex justify-between items-center mt-4">
+            <div class="text-xs text-gray-400 font-bold uppercase tracking-wider" id="contador-total">Processando registros...</div>
+            <div class="flex space-x-2">
+                <button id="btn-ant" onclick="mudarPagina(-1)" class="bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30 transition">◀ Anterior</button>
+                <button id="btn-prox" onclick="mudarPagina(1)" class="bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-30 transition">Próximo ▶</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let paginaAtual = 1;
+
+        async function carregarLogs(pagina = 1) {
+            paginaAtual = pagina;
+            const search = document.getElementById('search').value;
+            const status = document.getElementById('status').value;
+            const limit = document.getElementById('limit').value;
+
+            try {
+                const res = await fetch(`/api/logs?page=${pagina}&limit=${limit}&search=${search}&status=${status}`);
+                const json = await res.json();
+
+                const tbody = document.getElementById('tabela-dados');
+                tbody.innerHTML = '';
+
+                if(json.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-bold uppercase">Nenhum evento registrado nesta janela de busca</td></tr>`;
+                    return;
+                }
+
+                json.data.forEach(item => {
+                    const badgeStatus = item.status === 'BLOQUEADO' 
+                        ? '<span class="bg-red-950 text-red-400 border border-red-800/60骨 px-2 py-0.5 rounded text-xs font-bold">BLOCKED</span>'
+                        : '<span class="bg-emerald-950 text-green-400 border border-green-800/60 px-2 py-0.5 rounded text-xs font-bold">ALLOWED</span>';
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-750/40 transition duration-100">
+                            <td class="p-4 text-gray-400 text-xs">${item.data_hora}</td>
+                            <td class="p-4 font-bold text-teal-400">${item.usuario}</td>
+                            <td class="p-4 text-xs text-gray-300">${item.hostname} <span class="text-gray-500">[${item.ip}]</span></td>
+                            <td class="p-4 text-gray-200 truncate max-w-xs">${item.domain}</td>
+                            <td class="p-4 text-center">${badgeStatus}</td>
+                        </tr>
+                    `;
+                });
+
+                document.getElementById('contador-total').innerText = `Filtro Ativo // Total: ${json.total} eventos // Página ${json.page}`;
+                document.getElementById('btn-ant').disabled = paginaAtual === 1;
+                document.getElementById('btn-prox').disabled = (paginaAtual * limit) >= json.total;
+            } catch (err) {
+                document.getElementById('contador-total').innerText = "🔴 Falha ao sincronizar com o banco de dados do SIEM.";
+            }
+        }
+
+        function mudarPagina(direcao) {
+            carregarLogs(paginaAtual + direcao);
+        }
+
+        // Execução inicial
+        carregarLogs(1);
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@
             --accent-color: #1abc9c;
             --error-color: #e74c3c;
             --input-bg: #151d2a;
+            --border-color: #34495e;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,7 +22,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
+            box-sizing: border-box;
         }
         .container {
             background-color: var(--card-color);
@@ -31,6 +33,15 @@
             width: 100%;
             max-width: 450px;
             box-sizing: border-box;
+        }
+        .dashboard-container {
+            width: 95%;
+            max-width: 1400px;
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            margin: 20px auto;
         }
         h2 {
             text-align: center;
@@ -50,26 +61,26 @@
         }
         label {
             display: flex;
-            align-items: flex-end; /* Alinha a base dos textos dos labels */
+            align-items: flex-end;
             margin-bottom: 8px;
             font-size: 12px;
             font-weight: bold;
             color: #a3b2c1;
             text-transform: uppercase;
-            min-height: 32px; /* Força labels de 1 ou 2 linhas a ocuparem o mesmo espaço */
+            min-height: 32px;
             box-sizing: border-box;
         }
-        input {
+        input, select {
             width: 100%;
             padding: 12px;
             border-radius: 6px;
-            border: 1px solid #34495e;
+            border: 1px solid var(--border-color);
             background-color: var(--input-bg);
             color: white;
             box-sizing: border-box;
             font-size: 14px;
         }
-        input:focus {
+        input:focus, select:focus {
             border-color: var(--accent-color);
             outline: none;
         }
@@ -109,6 +120,62 @@
             gap: 15px;
         }
         .full-width { grid-column: span 2; }
+        
+        /* ESTILOS DO PAINEL DE LOGS */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            text-align: left;
+        }
+        .log-table th {
+            background-color: var(--input-bg);
+            color: #a3b2c1;
+            padding: 12px;
+            text-transform: uppercase;
+            font-size: 12px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .log-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .log-table tr:hover {
+            background-color: rgba(255,255,255,0.02);
+        }
+        .status-permitido { color: #2ecc71; font-weight: bold; }
+        .status-bloqueado { color: #e74c3c; font-weight: bold; }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .btn-small {
+            width: auto;
+            padding: 8px 16px;
+            margin: 0;
+        }
+        .btn-danger {
+            background-color: var(--error-color);
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
     </style>
 </head>
 <body>
@@ -169,11 +236,58 @@
                 <input type="text" id="ad-group" placeholder="Ex: SIEM_OPERADORES" required>
             </div>
             <button type="submit" class="full-width">Salvar e Ativar Conexão</button>
+            <button type="button" onclick="showDashboardScreen()" class="full-width" style="background-color: #34495e; color: white;">Pular para os Logs ➔</button>
         </form>
+    </div>
+
+    <div id="dashboard-screen" class="dashboard-container screen">
+        <div class="top-bar">
+            <div>
+                <h3 style="margin:0; color: var(--accent-color); letter-spacing: 1px;">SIEM // DR.MONITORA</h3>
+                <span style="font-size: 12px; color: #8a9ba8;">CONSOLE DE INGESTÃO LOGS (CLICKHOUSE ENGINE)</span>
+            </div>
+            <button onclick="handleLogout()" class="btn-small btn-danger">Sair / Logoff</button>
+        </div>
+
+        <div class="filter-bar">
+            <input type="text" id="search-log" placeholder="Buscar por Domínio ou IP de Origem..." oninput="loadLogs(1)">
+            <select id="filter-status" onchange="loadLogs(1)" style="max-width: 200px;">
+                <option value="">Todos os Status</option>
+                <option value="PERMITIDO">PERMITIDO</option>
+                <option value="BLOQUEADO">BLOQUEADO</option>
+            </select>
+        </div>
+
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>IP Origem</th>
+                    <th>Hostname (AD)</th>
+                    <th>Usuário (AD)</th>
+                    <th>Domínio Requisitado (DNS)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="log-rows">
+                <tr>
+                    <td colspan="6" style="text-align:center; color: #8a9ba8;">Aguardando pacotes syslog na porta 514/UDP...</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <span id="page-indicator" style="font-size: 13px; color: #8a9ba8;">Página 1</span>
+            <div style="display:flex; gap:10px;">
+                <button id="btn-prev" onclick="changePage(-1)" class="btn-small" style="background:#34495e; color:white;">Anterior</button>
+                <button id="btn-next" onclick="changePage(1)" class="btn-small" style="background:#34495e; color:white;">Próxima</button>
+            </div>
+        </div>
     </div>
 
     <script>
         let sessionToken = '';
+        let currentPage = 1;
 
         function showError(elementId, msg) {
             const box = document.getElementById(elementId);
@@ -267,12 +381,72 @@
             });
 
             if(res.ok) {
-                msgBox.innerText = "✓ Configurações salvas! SIEM integrado ao AD com sucesso.";
+                msgBox.innerText = "✓ Configurações salvas! Redirecionando para o painel...";
                 msgBox.style.display = 'block';
+                setTimeout(showDashboardScreen, 1500); // Avança após salvar
             } else {
                 const data = await res.json();
                 showError('settings-msg', data.error);
             }
+        }
+
+        function showDashboardScreen() {
+            document.getElementById('settings-screen').classList.remove('active');
+            document.body.style.alignItems = 'flex-start'; // Alinha o painel grande no topo
+            document.getElementById('dashboard-screen').classList.add('active');
+            loadLogs(1);
+            setInterval(() => loadLogs(currentPage), 5000); // Pooling de atualização a cada 5s
+        }
+
+        async function loadLogs(page) {
+            currentPage = page;
+            const search = document.getElementById('search-log').value;
+            const status = document.getElementById('filter-status').value;
+
+            const res = await fetch(`/api/logs?page=${page}&limit=50&search=${encodeURIComponent(search)}&status=${status}`, {
+                headers: { 'Authorization': sessionToken }
+            });
+
+            if(res.ok) {
+                const result = await res.json();
+                const tbody = document.getElementById('log-rows');
+                tbody.innerHTML = '';
+
+                if(result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: #8a9ba8;">Nenhum log capturado com os filtros atuais.</td></tr>`;
+                    return;
+                }
+
+                result.data.forEach(log => {
+                    const statusClass = log.status === 'PERMITIDO' ? 'status-permitido' : 'status-bloqueado';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${log.data_hora}</td>
+                            <td>${log.ip}</td>
+                            <td>${log.hostname}</td>
+                            <td>${log.usuario}</td>
+                            <td>${log.domain}</td>
+                            <td class="${statusClass}">${log.status}</td>
+                        </tr>
+                    `;
+                });
+
+                document.getElementById('page-indicator').innerText = `Página ${result.page} de ${Math.ceil(result.total / result.limit) || 1} (${result.total} registros)`;
+                document.getElementById('btn-prev').disabled = page === 1;
+                document.getElementById('btn-next').disabled = (page * result.limit) >= result.total;
+            }
+        }
+
+        function changePage(direction) {
+            loadLogs(currentPage + direction);
+        }
+
+        async function handleLogout() {
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: { 'Authorization': sessionToken }
+            });
+            window.location.reload();
         }
     </script>
 </body>

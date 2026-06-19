@@ -79,7 +79,6 @@ async function initDatabases() {
             );
         `);
 
-        // Extensões de metadados locais complementares ao AD
         await pgClient.query(`
             CREATE TABLE IF NOT EXISTS ad_user_extensions (
                 username VARCHAR(100) PRIMARY KEY,
@@ -101,7 +100,6 @@ async function initDatabases() {
 }
 setTimeout(initDatabases, 5000);
 
-// CRON: Varre agendamentos locais para marcar desativações pendentes
 setInterval(async () => {
     try {
         await pool.query("UPDATE ad_user_extensions SET desativar_em = NULL WHERE desativar_em <= NOW()");
@@ -141,7 +139,6 @@ app.post('/api/auth/login', async (req, res) => {
         } catch (err) { return res.status(500).json({ error: err.message }); }
     }
 
-    // Login de operador via AD
     try {
         const settingsRes = await pool.query('SELECT * FROM system_settings');
         const config = {};
@@ -180,7 +177,6 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🔍 BUSCA EM TEMPO REAL NO SEU ACTIVE DIRECTORY (LDAP SEARCH NATIVO)
 app.get('/api/ad/users', verificarToken, async (req, res) => {
     try {
         const settingsRes = await pool.query('SELECT * FROM system_settings');
@@ -188,7 +184,7 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
         settingsRes.rows.forEach(row => { config[row.key] = row.value; });
 
         if (!config.ad_ip || !config.ad_domain) {
-            return res.json([]); // Retorna vazio se a infraestrutura não foi configurada ainda
+            return res.json([]);
         }
 
         const computedBaseDN = config.ad_domain.split('.').map(part => `DC=${part}`).join(',');
@@ -200,13 +196,12 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
             username: computedBindUser,
             password: config.ad_pass,
             attributes: {
-                user: ['displayName', 'sAMAccountName', 'mail', 'userAccountControl', 'memberOf']
+                // CORREÇÃO CIRÚRGICA: dn e distinguishedName reinjetados para permitir a busca de grupos
+                user: ['dn', 'distinguishedName', 'displayName', 'sAMAccountName', 'mail', 'userAccountControl', 'memberOf']
             }
         };
 
         const ad = new ActiveDirectory(adConfig);
-        
-        // Filtro nativo LDAP para capturar contas de usuários reais excluindo contas de sistema construídas
         const searchFilter = '(&(objectCategory=person)(objectClass=user)(!(sAMAccountName=krbtgt))(!(sAMAccountName=Guest)))';
 
         ad.findUsers(searchFilter, true, async (err, adUsers) => {
@@ -217,7 +212,6 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
                 return res.json([]);
             }
 
-            // Puxa as extensões locais salvas no Postgres para consolidar a resposta híbrida
             const localExts = await pool.query("SELECT * FROM ad_user_extensions");
             const extMap = {};
             localExts.rows.forEach(r => { extMap[r.username] = r; });
@@ -225,8 +219,6 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
             const finalUsers = adUsers.map(u => {
                 const usernameLower = (u.sAMAccountName || '').toLowerCase();
                 const ext = extMap[usernameLower] || {};
-                
-                // Bitmask do Active Directory: 0x02 identifica conta desativada (ACCOUNTDISABLE)
                 const uac = u.userAccountControl || 0;
                 const activeStatus = !(uac & 2);
 
@@ -245,7 +237,7 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
                     computadores_autorizados: ext.computadores_autorizados || '*',
                     horarios_autorizados: ext.horarios_autorizados || '24H',
                     grupos: groupsList,
-                    trocar_senha_proximo_logon: !!(uac & 0x0080) // Bit 0x0080 indica password expired/must change
+                    trocar_senha_proximo_logon: !!(uac & 0x0080)
                 };
             });
 
@@ -254,7 +246,6 @@ app.get('/api/ad/users', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// INTERCEPTADORES DOS COMANDOS DE ESCRITA (PERSISTEM AS DIRETRIZES DE METADADOS)
 app.post('/api/ad/users', verificarToken, async (req, res) => {
     const { username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados } = req.body;
     try {
@@ -272,7 +263,7 @@ app.put('/api/ad/users/:username', verificarToken, async (req, res) => {
     const { username } = req.params;
     const { ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados } = req.body;
     try {
-        await pool.query(`
+        await pool.query suicide(`
             INSERT INTO ad_user_extensions (username, ramal_voip, vpn_access, desativar_em, computadores_autorizados, horarios_autorizados)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (username) DO UPDATE SET 

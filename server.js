@@ -6,15 +6,13 @@ const ActiveDirectory = require('activedirectory2');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
-const https = require('https');
-const fs = require('fs');
+const http = require('http');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Inicialização da conexão com o banco PostgreSQL usando as variáveis do .env
 const pool = new Pool({
     host: process.env.PG_HOST,
     user: process.env.PG_USER,
@@ -23,19 +21,16 @@ const pool = new Pool({
     port: 5432,
 });
 
-// Inicialização da conexão com o banco ClickHouse
 const chClient = createClient({
     url: process.env.CH_HOST,
     username: 'default',
     password: '',
 });
 
-// Função interna de hash para validação do usuário Day-0
 function gerarHash(senha) {
     return crypto.createHash('sha256').update(senha).digest('hex');
 }
 
-// Middleware de validação de sessão em tabelas relacionais
 function verificarToken(req, res, next) {
     const token = req.headers['authorization'];
     if (!token) return res.status(401).json({ error: 'Autenticação pendente.' });
@@ -48,7 +43,6 @@ function verificarToken(req, res, next) {
     });
 }
 
-// Provisionamento Day-0 de tabelas e injeção do usuário mestre temporário
 async function initDatabases() {
     const pgClient = await pool.connect();
     try {
@@ -65,7 +59,7 @@ async function initDatabases() {
         if (userCheck.rows.length === 0) {
             await pgClient.query('INSERT INTO siem_local_users (username, password_hash, force_change) VALUES ($1, $2, $3)', 
                 ['ADMIN', gerarHash('admin'), true]);
-            console.log("⚠️ [DAY-0] Usuário temporário criado: ADMIN / admin (Troca obrigatória no primeiro acesso).");
+            console.log("⚠️ [DAY-0] Usuário temporário criado: ADMIN / admin");
         }
 
         await pgClient.query(`
@@ -94,7 +88,6 @@ async function initDatabases() {
 }
 setTimeout(initDatabases, 5000);
 
-// Endpoint Híbrido de Autenticação (Local Admin / Active Directory)
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     const userUpper = username.toUpperCase();
@@ -123,26 +116,29 @@ app.post('/api/auth/login', async (req, res) => {
         const config = {};
         settingsRes.rows.forEach(row => { config[row.key] = row.value; });
 
-        if (!config.ad_url || !config.ad_base_dn || !config.ad_allowed_group) {
-            return res.status(400).json({ error: 'O sistema ainda não foi integrado ao Active Directory pelo Administrador.' });
+        if (!config.ad_ip || !config.ad_domain || !config.ad_allowed_group) {
+            return res.status(400).json({ error: 'O sistema ainda não foi integrado ao Active Directory.' });
         }
 
+        // INTEGRAÇÃO INTELIGENTE: O sistema monta as strings chatas do LDAP sozinho por baixo dos panos
+        const computedBaseDN = config.ad_domain.split('.').map(part => `DC=${part}`).join(',');
+        const computedBindUser = `${config.ad_user}@${config.ad_domain}`;
+
         const adConfig = {
-            url: config.ad_url,
-            baseDN: config.ad_base_dn,
-            username: config.ad_user,
+            url: `ldap://${config.ad_ip}:389`,
+            baseDN: computedBaseDN,
+            username: computedBindUser,
             password: config.ad_pass,
         };
 
-        const dominioLimpo = config.ad_base_dn.replace(/DC=/gi, '').replace(/,/g, '.');
-        const userPrincipalName = `${username}@${dominioLimpo}`;
+        const userPrincipalName = `${username}@${config.ad_domain}`;
         const ad = new ActiveDirectory(adConfig);
 
         ad.authenticate(userPrincipalName, password, (err, authSuccess) => {
             if (err || !authSuccess) return res.status(401).json({ error: 'Credenciais inválidas no Active Directory.' });
 
             ad.isUserMemberOf(userPrincipalName, config.ad_allowed_group, async (err, isMember) => {
-                if (err || !isMember) return res.status(403).json({ error: `Acesso negado. Seu usuário não pertence ao grupo '${config.ad_allowed_group}'.` });
+                if (err || !isMember) return res.status(403).json({ error: `Acesso negado. Usuário fora do grupo '${config.ad_allowed_group}'.` });
 
                 const token = crypto.randomBytes(32).toString('hex');
                 await pool.query('INSERT INTO siem_sessions (token, username, role, expiracao) VALUES ($1, $2, $3, NOW() + INTERVAL \'8 hours\')', 
@@ -154,7 +150,6 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Endpoint para troca obrigatória de senha do ADMIN local
 app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     const { new_password } = req.body;
     if (req.usuarioLogado !== 'ADMIN') return res.status(403).json({ error: 'Ação exclusiva do administrador.' });
@@ -166,7 +161,6 @@ app.post('/api/auth/change-password', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Obter configurações de infraestrutura
 app.get('/api/settings', verificarToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM system_settings');
@@ -178,9 +172,8 @@ app.get('/api/settings', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Salvar configurações de infraestrutura
 app.post('/api/settings', verificarToken, async (req, res) => {
-    if (req.usuarioRole !== 'ADMIN') return res.status(403).json({ error: 'Apenas administradores podem alterar a infraestrutura.' });
+    if (req.usuarioRole !== 'ADMIN') return res.status(403).json({ error: 'Acesso negado.' });
     const configs = req.body;
     try {
         for (const [key, value] of Object.entries(configs)) {
@@ -191,14 +184,12 @@ app.post('/api/settings', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Revogação de Token (Logout)
 app.post('/api/auth/logout', verificarToken, async (req, res) => {
     const token = req.headers['authorization'];
     await pool.query('DELETE FROM siem_sessions WHERE token = $1', [token]);
     res.json({ success: true });
 });
 
-// Receptor do Motor Syslog Nativo (Porta 514 UDP) para os Pi-Holes
 const syslogServer = dgram.createSocket('udp4');
 syslogServer.on('message', async (msg) => {
     const logLinha = msg.toString();
@@ -219,7 +210,6 @@ syslogServer.on('message', async (msg) => {
 });
 syslogServer.bind(514);
 
-// Webhook para Ingestão de Logons do Windows Active Directory (Nativo via PowerShell)
 app.post('/api/ad/logon', async (req, res) => {
     const { username, computer_name, ip } = req.body;
     try {
@@ -232,7 +222,6 @@ app.post('/api/ad/logon', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Endpoint Correlacionador Inteligente de Logs Massivos (ClickHouse)
 app.get('/api/logs', verificarToken, async (req, res) => {
     let { page = 1, limit = 500, search = '', status = '' } = req.query;
     page = parseInt(page); limit = parseInt(limit);
@@ -252,7 +241,6 @@ app.get('/api/logs', verificarToken, async (req, res) => {
             FROM default.dns_logs WHERE ${whereClause} ORDER BY timestamp DESC LIMIT ${limit} OFFSET ${offset}
         `;
         
-        // CORREÇÃO CIRÚRGICA DE SINTAXE REALIZADA AQUI:
         const totalResult = await chClient.query({ query: `SELECT count() as count FROM default.dns_logs WHERE ${whereClause}`, format: 'JSONEachRow' });
         const totalRows = await totalResult.json();
         const total = totalRows[0] ? parseInt(totalRows[0].count) : 0;
@@ -263,12 +251,7 @@ app.get('/api/logs', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Configurações do canal de criptografia HTTPS nativo do painel
-const sslOptions = {
-    key: fs.readFileSync(path.join(__dirname, 'certs/server.key')),
-    cert: fs.readFileSync(path.join(__dirname, 'certs/server.crt'))
-};
-
-https.createServer(sslOptions, app).listen(8443, () => {
-    console.log("🚀 [SIEM] Servidor HTTPS Ativo na porta 8443!");
+// Inicialização em HTTP Puro (Tráfego seguro gerenciado externamente pelo NPM)
+http.createServer(app).listen(8080, () => {
+    console.log("🚀 [SIEM] Servidor HTTP Ativo na porta 8080!");
 });

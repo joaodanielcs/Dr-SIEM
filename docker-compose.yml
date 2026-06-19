@@ -6,9 +6,9 @@ services:
     container_name: dr_siem_db
     restart: always
     environment:
-      POSTGRES_USER: drmonitora_admin
-      POSTGRES_PASSWORD: DrMonitoraSecure2026
-      POSTGRES_DB: dr_siem_governance
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -22,13 +22,15 @@ services:
     volumes:
       - ./:/usr/src/app
     ports:
-      - "8080:8080"      # Interface Web e Endpoints da API
-      - "514:514/udp"    # Receptor Syslog para os 3 Pi-holes (Rede Cabeada e Wireless)
+      - "8080:8080"      
+      - "514:514/udp"    
     environment:
       DB_HOST: db
-      DB_USER: drmonitora_admin
-      DB_PASSWORD: DrMonitoraSecure2026
-      DB_NAME: dr_siem_governance
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin}
       PORT: 8080
     depends_on:
       - db

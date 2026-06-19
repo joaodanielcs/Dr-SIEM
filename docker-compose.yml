@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: dr_siem_db
+    restart: always
+    environment:
+      POSTGRES_USER: drmonitora_admin
+      POSTGRES_PASSWORD: DrMonitoraSecure2026
+      POSTGRES_DB: dr_siem_governance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    image: node:18-alpine
+    container_name: dr_siem_backend
+    restart: always
+    working_dir: /usr/src/app
+    volumes:
+      - ./:/usr/src/app
+    ports:
+      - "8080:8080"      # Interface Web e Endpoints da API
+      - "514:514/udp"    # Receptor Syslog para os 3 Pi-holes (Rede Cabeada e Wireless)
+    environment:
+      DB_HOST: db
+      DB_USER: drmonitora_admin
+      DB_PASSWORD: DrMonitoraSecure2026
+      DB_NAME: dr_siem_governance
+      PORT: 8080
+    depends_on:
+      - db
+    command: sh -c "npm install && node server.js"
+
+volumes:
+  postgres_data:

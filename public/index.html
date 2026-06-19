@@ -117,7 +117,7 @@
         <form onsubmit="handleLogin(event)">
             <div class="form-group">
                 <label>Usuário / Domínio</label>
-                <input type="text" id="username" placeholder="Ex: admin ou usuario" required autocomplete="username">
+                <input type="text" id="username" placeholder="Ex: admin" required autocomplete="username">
             </div>
             <div class="form-group">
                 <label>Chave de Acesso</label>
@@ -147,7 +147,7 @@
         <form onsubmit="handleSaveSettings(event)" class="ad-grid">
             <div class="form-group">
                 <label>IP do Controlador de Domínio (AD)</label>
-                <input type="text" id="ad-ip" placeholder="Ex: 10.0.0.10" required>
+                <input type="text" id="ad-ip" placeholder="Ex: 10.0.0.1" required>
             </div>
             <div class="form-group">
                 <label>Domínio Principal</label>
@@ -163,7 +163,7 @@
             </div>
             <div class="form-group full-width">
                 <label>Grupo do AD com Permissão de Acesso</label>
-                <input type="text" id="ad-group" placeholder="Ex: GG_SIEM_OPERADORES" required>
+                <input type="text" id="ad-group" placeholder="Ex: SIEM_OPERADORES" required>
             </div>
             <button type="submit" class="full-width">Salvar e Ativar Conexão</button>
         </form>

@@ -29,7 +29,7 @@ fi
 
 if [ ! -f .env ]; then
     echo "🔒 Provisionando senhas aleatórias seguras para o banco de dados..."
-    SENHA_BANCO_ALEATORIA=$(openssl rand -base64 18)
+    SENHA_BANCO_ALEATORIA=$(openssl rand -hex 16)
 
     cat << EOF > .env
 # ====== CONFIGURAÇÕES DO BANCO DE DADOS ======
@@ -67,7 +67,7 @@ EOF
 
 systemctl daemon-reload > /dev/null 2>&1
 systemctl enable dr-siem.service > /dev/null 2>&1
-echo "✓ Serviço dr-siem.service registrado!"
+echo "✓ Servicio dr-siem.service registrado!"
 
 echo "🚀 Subindo os containers do SIEM (Aguarde alguns instantes)..."
 docker compose up -d > /dev/null 2>&1

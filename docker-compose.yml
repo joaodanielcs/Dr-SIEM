@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -17,8 +17,8 @@ services:
     ports:
       - "8123:8123"      
     volumes:
-      - ch_data:/var/lib/clickhouse
-      - ch_logs:/var/log/clickhouse-server
+      - ./data/clickhouse:/var/lib/clickhouse
+      - ./data/clickhouse_logs:/var/log/clickhouse-server
 
   app:
     image: node:18-alpine
@@ -40,8 +40,3 @@ services:
       - relational_db
       - clickhouse
     command: sh -c "npm install && node server.js"
-
-volumes:
-  pg_data:
-  ch_data:
-  ch_logs:

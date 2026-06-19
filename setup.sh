@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  SIEM - Dr.monitora // SCRIPT DE BOOTSTRAP E PROVISIONAMENTO CRIPTOGRÁFICO
+#  SIEM - Dr.monitora // SCRIPT DE BOOTSTRAP E PROVISIONAMENTO CRIPTOGRÁFICO SSL
 # ==============================================================================
 
 echo "🔍 Verificando privilégios e iniciando provisionamento seguro..."
@@ -28,14 +28,23 @@ else
     echo "✓ Engine do Docker validada."
 fi
 
-# 3. Geração Dinâmica do Arquivo .env com chaves aleatórias em tempo de execução
+# 3. Geração Automática dos Certificados SSL Internos (Zero Trust)
+if [ ! -d certs ]; then
+    echo "🔐 Gerando Certificado SSL Autoassinado para comunicação HTTPS interna..."
+    mkdir -p certs
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout certs/server.key \
+      -out certs/server.crt \
+      -subj "/C=BR/ST=SP/L=SaoPaulo/O=DrMonitora/OU=IT/CN=drsiem.local"
+    chmod 600 certs/server.key
+    echo "✓ Certificados SSL internos gerados!"
+fi
+
+# 4. Geração Dinâmica do Arquivo .env
 if [ ! -f .env ]; then
     echo "🔒 Gerando credenciais exclusivas e criando o arquivo .env..."
-    
-    # Gera uma senha randômica complexa e segura de 24 caracteres para o banco de dados
     SENHA_BANCO_ALEATORIA=$(openssl rand -base64 18)
 
-    # Escreve o arquivo .env exatamente no formato exigido
     cat << EOF > .env
 # ====== CONFIGURAÇÕES DO BANCO DE DADOS ======
 POSTGRES_USER=dbadmin
@@ -47,15 +56,14 @@ INITIAL_ADMIN_USER=admin
 INITIAL_ADMIN_PASSWORD=admin
 EOF
 
-    # Medida Crítica de SI: Altera permissões para que apenas o Root leia o arquivo
     chmod 600 .env
-    echo "✓ Arquivo .env estruturado e protegido com sucesso (Chmod 600 aplicado)!"
+    echo "✓ Arquivo .env estruturado e protegido (Chmod 600 aplicado)!"
 else
     echo "✓ Arquivo .env existente detectado. Pulando etapa de geração para preservar dados."
 fi
 
-# 4. Configuração do Serviço de Persistência Systemd no Kernel do Linux
-echo "⚙️ Registrando serviço dr-siem no Systemd para autoinicialização corporativa..."
+# 5. Configuração do Serviço de Persistência Systemd
+echo "⚙️ Registrando serviço dr-siem no Systemd..."
 DIR_ATUAL=$(pwd)
 
 cat << EOF > /etc/systemd/system/dr-siem.service
@@ -76,7 +84,7 @@ StandardOutput=journal
 WantedBy=multi-user.target
 EOF
 
-# 5. Inicialização da Stack
+# 6. Inicialização da Stack
 systemctl daemon-reload
 systemctl enable dr-siem.service
 
@@ -85,7 +93,6 @@ systemctl start dr-siem.service
 
 echo "=============================================================================="
 echo "🎯 [SIEM - Dr.monitora] INFRAESTRUTURA MONTADA COM SUCESSO!"
-echo "🌐 Painel de Governança disponível em: http://$(hostname -I | awk '{print $1}'):8080"
+echo "🌐 Painel de Governança disponível em HTTPS na porta padrão 443 do servidor"
 echo "🔐 Autenticação da Interface: admin / admin"
-echo "🗄️ Segurança do Banco: Usuário 'dbadmin' com senha criptográfica gerada no .env"
 echo "=============================================================================="

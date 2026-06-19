@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  SIEM - Dr.monitora // AUTOMATED PRODUCTION BOOTSTRAP (HTTP MODE)
+#  SIEM - Dr.monitora // AUTOMATED PRODUCTION BOOTSTRAP (STRICT HTTPS ONLY)
 # ==============================================================================
 
 # 1. Validação de privilégios de segurança
@@ -22,7 +22,19 @@ else
     echo "✓ Engine do Docker já validada."
 fi
 
-# 3. Geração Dinâmica do Arquivo .env com credenciais de alta entropia
+# 3. Fabricação das chaves SSL obrigatórias para o bindi do HTTPS interno
+if [ ! -d certs ]; then
+    echo "🔐 Gerando chaves SSL internas para sustentação do protocolo HTTPS..."
+    mkdir -p certs
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout certs/server.key \
+      -out certs/server.crt \
+      -subj "/C=BR/ST=SP/L=Local/O=SIEM/OU=Infra/CN=siem.local" > /dev/null 2>&1
+    chmod 600 certs/server.key > /dev/null 2>&1
+    echo "✓ Certificados SSL internos ativados!"
+fi
+
+# 4. Geração Dinâmica do Arquivo .env com credenciais de alta entropia
 if [ ! -f .env ]; then
     echo "🔒 Provisionando senhas aleatórias seguras para o banco de dados..."
     SENHA_BANCO_ALEATORIA=$(openssl rand -hex 16)
@@ -40,7 +52,7 @@ else
     echo "✓ Arquivo .env existente detectado."
 fi
 
-# 4. Configuração do Serviço de Persistência Systemd (Para o boot do hardware)
+# 5. Configuração do Serviço de Persistência Systemd (Para o boot do hardware)
 echo "⚙️ Configurando serviço Systemd para persistência pós-reboot..."
 DIR_ATUAL=$(pwd)
 
@@ -66,13 +78,13 @@ systemctl daemon-reload > /dev/null 2>&1
 systemctl enable dr-siem.service > /dev/null 2>&1
 echo "✓ Serviço dr-siem.service registrado!"
 
-# 5. Inicialização da Stack Docker com Armazenamento Local Relativo
-echo "🚀 Subindo os containers do SIEM (Aguarde alguns instantes)..."
+# 6. Inicialização da Stack Docker com Armazenamento Local Relativo
+echo "🚀 Subindo os containers do SIEM em ambiente criptografado (Aguarde)..."
 docker compose up -d > /dev/null 2>&1
 
 echo "=============================================================================="
 echo "🎯 [SIEM - Dr.monitora] INFRAESTRUTURA ONLINE!"
-echo "🌐 Modo HTTP Interno Ativo na porta 8080"
-echo "🔀 Aponte o Nginx Proxy Manager (NPM) para este IP na porta 8080"
+echo "🔒 MODO STRICT HTTPS ATIVO NA PORTA 443"
+echo "🔀 No NPM, configure o Forward Scheme como: HTTPS na porta 443"
 echo "🔑 Login inicial temporário: admin / admin"
 echo "=============================================================================="
